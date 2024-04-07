@@ -1,0 +1,12 @@
+<pnp xmlns="urn:cisco:pnp" version="1.0" udi="{{ udi }}">
+		<request xmlns="urn:cisco:pnp:backoff" correlator="{{ correlator_id }}">
+				<backoff>
+						<reason>take it easy</reason>
+						<callbackAfter>
+								<hours>{{ hours }}</hours>
+								<minutes>{{ minutes }}</minutes>
+								<seconds>{{ seconds }}</seconds>
+						</callbackAfter>
+				</backoff>
+		</request>    
+</pnp>

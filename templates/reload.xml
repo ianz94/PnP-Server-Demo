@@ -1,0 +1,10 @@
+<pnp xmlns="urn:cisco:pnp" version="1.0" udi="{{ udi }}">
+        <request xmlns="urn:cisco:pnp:reload" correlator="{{ correlator_id }}">
+                <reload>
+                        <reason>PnP Software install</reason>
+                        <delayIn>0</delayIn>
+                        <user>TOJO_AND_BEAN</user>
+                        <eraseConfig>true</eraseConfig>
+                </reload>
+        </request>
+</pnp>

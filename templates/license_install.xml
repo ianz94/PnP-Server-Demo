@@ -1,0 +1,19 @@
+<pnp xmlns="urn:cisco:pnp" version="1.0" udi="{{ udi }}">
+	<request xmlns="urn:cisco:pnp:licensing" correlator="{{ correlator_id }}">
+		<licensing>
+			<EULA accept="yes"/>
+			<level> 
+				appxk9
+			</level>
+			<apply>
+				<feature>securityk9</feature>
+			</apply>
+		</licensing>
+		<reload>
+			<reason>License change</reason>
+			<delayIn>0</delayIn>
+			<user>test</user>
+            <saveConfig>false</saveConfig>
+		</reload>			
+	</request>
+</pnp>

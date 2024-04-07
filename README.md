@@ -1,2 +1,3 @@
 # PnP-Server-Demo
-A demo Cisco PNP Server
+
+A super-simple minimalized Cisco Plug-n-Play Server developed with Python Flask framework, with the capability of sending config file to a Cisco router through HTTP request.

@@ -1,0 +1,9 @@
+<pnp xmlns="urn:cisco:pnp" version="1.0" udi="{{ udi }}">
+    <request xmlns="urn:cisco:pnp:cli-exec" correlator="{{ correlator_id }}">
+        <execCLI maxWait="PT10S" xsd="false">
+            <cmd>
+                {{ command }}
+            </cmd>
+        </execCLI>
+    </request>
+</pnp>
