@@ -1,3 +1,3 @@
-pnp_server = '10.141.65.137'
+pnp_server = '10.85.8.109'
 service_port = '80'
 debug_mode = False
