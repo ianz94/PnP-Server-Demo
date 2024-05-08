@@ -5,7 +5,7 @@ from flask import Flask, request, send_from_directory, render_template, Response
 from requests import head
 import xmltodict
 import pnp_env
-from pnp_utils import Device, PNP_STATE
+from pnp_utils import PNP_STATE, Device, SoftwareImage
 
 # SERIAL_NUM_RE = re.compile(r'PID:(?P<product_id>[\w|\/|-]+),VID:(?P<hw_version>\w+),SN:(?P<serial_number>\w+)')
 
@@ -38,7 +38,7 @@ def pnp_install_image(udi: str, correlator: str) -> str:
             'image_name': device.target_image.image,
             'md5': device.target_image.md5.lower(),
             'destination': 'bootflash',
-            'delay': 0,  # reload in seconds
+            # 'delay': 0,  # reload in seconds
         }
         _template = render_template('image_install.xml', **jinja_context)
         # log_info(_template, SETTINGS.debug)
@@ -107,9 +107,10 @@ def create_new_device(udi: str, src_addr: str):
         serial_number=serial_number,
         platform=platform,
         hw_rev=hw_rev,
-        current_job='urn:cisco:pnp:device-info',
-        pnp_state=PNP_STATE['NEW_DEVICE']
+        current_job='urn:cisco:pnp:device-info'
     )
+    devices[udi].pnp_state = PNP_STATE['NEW_DEVICE']
+    devices[udi].target_image = test_image
     # device = devices[udi]
     # device.backoff = True
     # for image, image_data in IMAGES.images.items():
@@ -197,22 +198,25 @@ def pnp_work_request():
         if device.pnp_state == PNP_STATE['NEW_DEVICE']:
             # log_info('PNPFLOW.NEW', SETTINGS.debug)
             device.pnp_state = PNP_STATE['INFO']
-            return Response(pnp_device_info(udi, correlator, 'all'), mimetype='text/xml')
+            _response = pnp_device_info(udi, correlator, 'all')
         elif device.pnp_state == PNP_STATE['UPGRADE_NEEDED']:
             # log_info('PNPFLOW.INFO', SETTINGS.debug)
             device.pnp_state = PNP_STATE['UPGRADE_INPROGRESS']
-            return Response(pnp_install_image(udi, correlator), mimetype='text/xml')
+            _response = pnp_install_image(udi, correlator)
         elif device.pnp_state == PNP_STATE['UPGRADE_RELOAD']:
             # loginfo
-            return Response(pnp_device_info(udi, correlator, 'all'), mimetype='text/xml')
+            _response = pnp_device_info(udi, correlator, 'all')
         elif device.pnp_state == PNP_STATE['UPGRADE_DONE']:
             # loginfo
-            return Response(pnp_config_upgrade(udi, correlator), mimetype='text/xml')
+            _response = pnp_config_upgrade(udi, correlator)
     else:
         create_new_device(udi, src_addr)
         devices[udi].pnp_state = PNP_STATE['INFO']
-        return Response(pnp_device_info(udi, correlator, 'all'), mimetype='text/xml')
-
+        _response = pnp_device_info(udi, correlator, 'all')
+    
+    print(xmltodict.unparse(xmltodict.parse(_response), full_document=False, pretty=True))
+    print('==============================================')
+    return Response(_response, mimetype='text/xml')
     #  configuration register ???
 
     # print(xmltodict.unparse(xmltodict.parse(result_data), full_document=False, pretty=True))
@@ -260,17 +264,24 @@ def pnp_work_response():
             elif job_type == 'urn:cisco:pnp:backoff':
                 # device.pnp_flow = PNPFLOW.INFO
                 pass
-            _response = pnp_bye(udi, correlator)
-            # log_info(_response, SETTINGS.debug)
-            return Response(_response, mimetype='text/xml')
-        elif job_status == 0:
+            # _response = pnp_bye(udi, correlator)
+            # # log_info(_response, SETTINGS.debug)
+            # print(xmltodict.unparse(xmltodict.parse(_response), full_document=False, pretty=True))
+            # print('==============================================')
+            # return Response(_response, mimetype='text/xml')
+        # elif job_status == 0:
             # error_code = int(data['pnp']['response']['errorInfo']['errorCode'].split(' ')[-1])
             # device.error_count += 1
             # device.error_message = data['pnp']['response']['errorInfo']['errorMessage']
             # device.error_code = error_code
             # if error_code in [ERROR.PNP_ERROR_BAD_CHECKSUM, ERROR.PNP_ERROR_FILE_NOT_FOUND]:
             #     device.hard_error = True
-            return Response(pnp_bye(udi, correlator), mimetype='text/xml')
+            # return Response(pnp_bye(udi, correlator), mimetype='text/xml')
+        _response = pnp_bye(udi, correlator)
+        # log_info(_response, SETTINGS.debug)
+        print(xmltodict.unparse(xmltodict.parse(_response), full_document=False, pretty=True))
+        print('==============================================')
+        return Response(_response, mimetype='text/xml')
     device.current_job = 'none'
     return Response('')
 
@@ -288,5 +299,11 @@ def pnp_work_response():
 if __name__ == '__main__':
 
     devices = {}
+    test_image = SoftwareImage(
+        image='c1100-universalk9.17.14.01a.SPA.bin',
+        version='17.14.1a',
+        md5='ac8c06a8431d26b723c92f0aa245bfe7',
+        size = 716699088
+    )
 
     app.run(host= '0.0.0.0', port=pnp_env.service_port) #debug=pnp_env.debug_mode)

@@ -11,6 +11,7 @@ PNP_STATE_LIST = [
 ]
 PNP_STATE = {STR:IDX for IDX,STR in enumerate(PNP_STATE_LIST)}
 
+
 class SoftwareImage:
     def __init__(self, image: str, version: str, md5: str, size: int):
         self.image: str = image
@@ -18,10 +19,10 @@ class SoftwareImage:
         self.md5: str = md5
         self.size: int = size
 
+
 class Device:
     def __init__(self, udi: str, platform: str, hw_rev: str, serial_number: str, first_seen: str, last_contact: str,
                  src_address: str, current_job: str):
-
         self.udi: str = udi
         self.platform: str = platform
         self.hw_rev: str = hw_rev
