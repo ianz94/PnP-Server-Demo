@@ -1,5 +1,5 @@
 <pnp xmlns="urn:cisco:pnp" version="1.0" udi="{{ udi }}">
-  <info xmlns="urn:cisco:pnp:work-info" correlator="{{ correlator_id }}">
+  <info xmlns="urn:cisco:pnp:work-info" correlator="{{ correlator }}">
     <workInfo>
       <bye/>
     </workInfo>

@@ -1,5 +1,5 @@
 <pnp xmlns="urn:cisco:pnp" version="1.0" udi="{{ udi }}">
-	<request xmlns="urn:cisco:pnp:licensing" correlator="{{ correlator_id }}">
+	<request xmlns="urn:cisco:pnp:licensing" correlator="{{ correlator }}">
 		<licensing>
 			<EULA accept="yes"/>
 			<level> 

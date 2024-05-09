@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pnp xmlns="urn:cisco:pnp" version="1.0" udi="{{ udi }}">
-  <request correlator="{{ correlator_id }}" xmlns="urn:cisco:pnp:config-upgrade">
+  <request correlator="{{ correlator }}" xmlns="urn:cisco:pnp:config-upgrade">
     <config details="all">
       <copy>
         <source>

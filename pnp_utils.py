@@ -2,11 +2,13 @@ PNP_STATE_LIST = [
     'NONE',
     'NEW_DEVICE',
     'INFO',
+    'CONFIG_START',
+    'CONFIG_RUN',
+    'CONFIG_SAVE_STARTUP',
     'UPGRADE_NEEDED',
     'UPGRADE_INPROGRESS',
     'UPGRADE_RELOAD',
     'UPGRADE_DONE',
-    'CONFIG_START',
     'FINISHED'
 ]
 PNP_STATE = {STR:IDX for IDX,STR in enumerate(PNP_STATE_LIST)}
@@ -36,3 +38,4 @@ class Device:
         self.version: str = ''
         self.image: str = ''
         self.target_image: SoftwareImage = None
+        self.is_configured: bool = False

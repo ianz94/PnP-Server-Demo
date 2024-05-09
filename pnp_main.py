@@ -13,6 +13,7 @@ def pnp_device_info(udi: str, correlator: str, info_type: str) -> str:
     # info_type can be one of:
     # image, hardware, filesystem, udi, profile, all
     device = devices[udi]
+    # is current_job really necessary??
     if device.current_job != 'urn:cisco:pnp:image-install':
         device.current_job = 'urn:cisco:pnp:device-info'
     jinja_context = {
@@ -79,6 +80,34 @@ def pnp_config_upgrade(udi: str, correlator: str) -> str:
         'config_filename': cfg_file,
     }
     _template = render_template('config_upgrade.xml', **jinja_context)
+    # log_info(_template, SETTINGS.debug)
+    return _template
+
+
+def pnp_cli_exec(udi: str, correlator: str, command: str) -> str:
+    jinja_context = {
+        'udi': udi,
+        'correlator': correlator,
+        'command': command
+    }
+    return render_template('cli_exec.xml', **jinja_context)
+
+
+def pnp_backoff(udi: str, correlator: str, minutes: int) -> str:
+    seconds = 0
+    hours = 0
+    # device = devices[udi]
+    # device.status = f'backoff for {hours:02d}:{minutes:02d}:{seconds:02d}'
+    # device.current_job = 'urn:cisco:pnp:backoff'
+    # device.backoff = False
+    jinja_context = {
+        'udi': udi,
+        'correlator': correlator,
+        'seconds': seconds,
+        'minutes': minutes,
+        'hours': hours,
+    }
+    _template = render_template('backoff.xml', **jinja_context)
     # log_info(_template, SETTINGS.debug)
     return _template
 
@@ -199,16 +228,21 @@ def pnp_work_request():
             # log_info('PNPFLOW.NEW', SETTINGS.debug)
             device.pnp_state = PNP_STATE['INFO']
             _response = pnp_device_info(udi, correlator, 'all')
+        elif device.pnp_state == PNP_STATE['CONFIG_START']:
+            # loginfo
+            _response = pnp_config_upgrade(udi, correlator)
+        elif device.pnp_state == PNP_STATE['CONFIG_RUN']:
+            _response = pnp_cli_exec(udi, correlator, 'write memory')
         elif device.pnp_state == PNP_STATE['UPGRADE_NEEDED']:
             # log_info('PNPFLOW.INFO', SETTINGS.debug)
             device.pnp_state = PNP_STATE['UPGRADE_INPROGRESS']
             _response = pnp_install_image(udi, correlator)
-        elif device.pnp_state == PNP_STATE['UPGRADE_RELOAD']:
+        elif device.pnp_state in [PNP_STATE['UPGRADE_RELOAD'], PNP_STATE['CONFIG_SAVE_STARTUP']]:
             # loginfo
             _response = pnp_device_info(udi, correlator, 'all')
         elif device.pnp_state == PNP_STATE['UPGRADE_DONE']:
             # loginfo
-            _response = pnp_config_upgrade(udi, correlator)
+            _response = pnp_backoff(udi, correlator, 1)
     else:
         create_new_device(udi, src_addr)
         devices[udi].pnp_state = PNP_STATE['INFO']
@@ -250,17 +284,23 @@ def pnp_work_response():
             #     device.backoff = True
             # device.error_count = 0
             if job_type == 'urn:cisco:pnp:device-info':
-                if device.pnp_state in [PNP_STATE['INFO'], PNP_STATE['UPGRADE_RELOAD']]:
-                    update_device_info(data)
-                    check_update(udi)
+                if device.is_configured:
+                    if device.pnp_state in [PNP_STATE['INFO'], PNP_STATE['CONFIG_SAVE_STARTUP'], PNP_STATE['UPGRADE_RELOAD']]:
+                        update_device_info(data)
+                        check_update(udi)
+                    else:
+                        update_device_info(data)
                 else:
-                    update_device_info(data)
+                    device.pnp_state = PNP_STATE['CONFIG_START']
             elif job_type == 'urn:cisco:pnp:image-install':
                 device.pnp_state = PNP_STATE['UPGRADE_RELOAD']
             elif job_type == 'urn:cisco:pnp:config-upgrade':
                 # device.pnp_flow = PNPFLOW.CONFIG_DOWN  # we don't reach this as we remove PNP before via EEM
-                device.pnp_state = PNP_STATE['FINISHED']
+                device.is_configured = True
+                device.pnp_state = PNP_STATE['CONFIG_RUN']
                 # device.status = 'Finished. You can remove the device from the list :-)'
+            elif job_type == 'urn:cisco:pnp:cli-exec':
+                device.pnp_state = PNP_STATE['CONFIG_SAVE_STARTUP']
             elif job_type == 'urn:cisco:pnp:backoff':
                 # device.pnp_flow = PNPFLOW.INFO
                 pass

@@ -1,5 +1,5 @@
 <pnp xmlns="urn:cisco:pnp" version="1.0" udi="{{ udi }}" noCheckTime="20" postReloadPriv="ztd">
-        <request xmlns="urn:cisco:pnp:cli-config" correlator="{{ correlator_id }}">
+        <request xmlns="urn:cisco:pnp:cli-config" correlator="{{ correlator }}">
                 <configApply details="all">
                         <config-data>
                                 <cli-config-data>

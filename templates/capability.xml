@@ -1,4 +1,4 @@
 <pnp xmlns="urn:cisco:pnp" version="1.0" udi="{{ udi }}">
-	<request xmlns="urn:cisco:pnp:capability" correlator="{{ correlator_id }}">
+	<request xmlns="urn:cisco:pnp:capability" correlator="{{ correlator }}">
 	</request>
 </pnp>

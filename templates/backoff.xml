@@ -1,7 +1,7 @@
 <pnp xmlns="urn:cisco:pnp" version="1.0" udi="{{ udi }}">
-		<request xmlns="urn:cisco:pnp:backoff" correlator="{{ correlator_id }}">
+		<request xmlns="urn:cisco:pnp:backoff" correlator="{{ correlator }}">
 				<backoff>
-						<reason>take it easy</reason>
+						<reason>image upgrade has finished</reason>
 						<callbackAfter>
 								<hours>{{ hours }}</hours>
 								<minutes>{{ minutes }}</minutes>
