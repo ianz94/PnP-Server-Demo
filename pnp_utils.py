@@ -24,13 +24,12 @@ class SoftwareImage:
 
 class Device:
     def __init__(self, udi: str, platform: str, hw_rev: str, serial_number: str, first_seen: str, last_contact: str,
-                 src_address: str, current_job: str):
+                 src_address: str):
         self.udi: str = udi
         self.platform: str = platform
         self.hw_rev: str = hw_rev
         self.serial_number: str = serial_number
         self.ip_address: str = src_address
-        self.current_job: str = current_job
         self.first_seen: str = first_seen
         self.last_contact: str = last_contact
         

@@ -1,23 +1,15 @@
 from time import strftime
 from flask import Flask, request, send_from_directory, render_template, Response
 from apscheduler.schedulers.background import BackgroundScheduler
-# from pathlib import Path
-# import re
 from requests import head
 import xmltodict
 import csv
 import pnp_env
 from pnp_utils import PNP_STATE_LIST, PNP_STATE, Device, SoftwareImage
 
-# SERIAL_NUM_RE = re.compile(r'PID:(?P<product_id>[\w|\/|-]+),VID:(?P<hw_version>\w+),SN:(?P<serial_number>\w+)')
-
 def pnp_device_info(udi: str, correlator: str, info_type: str) -> str:
     # info_type can be one of:
     # image, hardware, filesystem, udi, profile, all
-    device = devices[udi]
-    # is current_job really necessary??
-    if device.current_job != 'urn:cisco:pnp:image-install':
-        device.current_job = 'urn:cisco:pnp:device-info'
     jinja_context = {
         'udi': udi,
         'correlator': correlator,
@@ -30,25 +22,18 @@ def pnp_install_image(udi: str, correlator: str) -> str:
     device = devices[udi]
     response = head(f'{pnp_env.image_url}/{device.target_image.image}')
     if response.status_code == 200:
-        device.current_job = 'urn:cisco:pnp:image-install'
         device.pnp_state = PNP_STATE['UPGRADE_INPROGRESS']
-        # device.backoff = True
-        # device.refresh_data = True
         jinja_context = {
             'udi': udi,
             'correlator': correlator,
             'base_url': pnp_env.image_url,
             'image_name': device.target_image.image,
             'md5': device.target_image.md5.lower(),
-            'destination': 'bootflash',
-            # 'delay': 0,  # reload in seconds
+            'destination': 'bootflash'
         }
         _template = render_template('image_install.xml', **jinja_context)
-        # log_info(_template, SETTINGS.debug)
         return _template
     else:
-        # device.error_code = ERROR.ERROR_NO_IMAGE_FILE
-        # device.hard_error = True
         print('image does not exist!!!!!!')
         return ''
 
@@ -58,31 +43,23 @@ def pnp_config_upgrade(udi: str, correlator: str) -> str:
     cfg_file = f'{device.serial_number}.cfg'
     response = head(f'{pnp_env.config_url}/{cfg_file}')
     if response.status_code != 200:  # SERIAL.cfg not found
-        # if not SETTINGS.no_default_cfg:
-        #     cfg_file = SETTINGS.default_cfg
-        #     response = head(f'{SETTINGS.config_url}/{cfg_file}')
-        #     if response.status_code != 200:  # DEFAULT.cfg also not found
-        #         device.error_code = ERROR.ERROR_NO_CFG_FILE
-        #         device.hard_error = True
-        #         return
-        # else:
-        #     device.error_code = ERROR.ERROR_NO_CFG_FILE
-        #     device.hard_error = True
-        #     return
-        print('config does not exist!!!!!!')
-        return ''
-
-    device.current_job = 'urn:cisco:pnp:config-upgrade'
+        if pnp_env.default_cfg_exists:
+            cfg_file = pnp_env.default_cfg_filename
+            response = head(f'{pnp_env.config_url}/{cfg_file}')
+            if response.status_code != 200:  # default.cfg also not found
+                print('config does not exist!!!!!!')
+                return
+        else:
+            print('config does not exist!!!!!!')
+            return ''
     device.pnp_state = PNP_STATE['CONFIG_START']
     jinja_context = {
         'udi': udi,
         'correlator': correlator,
         'base_url': pnp_env.config_url,
-        # 'reload_delay': 30,  # reload in seconds
         'config_filename': cfg_file,
     }
     _template = render_template('config_upgrade.xml', **jinja_context)
-    # log_info(_template, SETTINGS.debug)
     return _template
 
 
@@ -98,10 +75,6 @@ def pnp_cli_exec(udi: str, correlator: str, command: str) -> str:
 def pnp_backoff(udi: str, correlator: str, minutes: int) -> str:
     seconds = 0
     hours = 0
-    # device = devices[udi]
-    # device.status = f'backoff for {hours:02d}:{minutes:02d}:{seconds:02d}'
-    # device.current_job = 'urn:cisco:pnp:backoff'
-    # device.backoff = False
     jinja_context = {
         'udi': udi,
         'correlator': correlator,
@@ -110,7 +83,6 @@ def pnp_backoff(udi: str, correlator: str, minutes: int) -> str:
         'hours': hours,
     }
     _template = render_template('backoff.xml', **jinja_context)
-    # log_info(_template, SETTINGS.debug)
     return _template
 
 
@@ -137,8 +109,7 @@ def create_new_device(udi: str, src_addr: str):
         src_address=src_addr,
         serial_number=serial_number,
         platform=platform,
-        hw_rev=hw_rev,
-        current_job='urn:cisco:pnp:device-info'
+        hw_rev=hw_rev
     )
     devices[udi].pnp_state = PNP_STATE['NEW_DEVICE']
     devices[udi].target_image = test_image
@@ -158,23 +129,11 @@ def create_new_device(udi: str, src_addr: str):
 
 
 def update_device_info(data: dict):
-    # destination = {}
-
     udi = data['pnp']['@udi']
     device = devices[udi]
-
     device.version = data['pnp']['response']['imageInfo']['versionString'].strip()
     device.image = data['pnp']['response']['imageInfo']['imageFile'].split(':')[1]
-    # device.refresh_data = False
     device.last_contact = strftime(pnp_env.time_format)
-    # for filesystem in data['pnp']['response']['fileSystemList']['fileSystem']:
-    #     if filesystem['@name'] in ['bootflash', 'flash']:
-    #         destination = filesystem
-
-    # device.platform = data['pnp']['response']['hardwareInfo']['platformName']
-    # device.serial = data['pnp']['response']['hardwareInfo']['boardId']
-    # device.destination_name = destination['@name']
-    # device.destination_free = int(destination['@freespace'])
 
 
 def check_update(udi: str):
@@ -183,10 +142,6 @@ def check_update(udi: str):
         device.pnp_state = PNP_STATE['UPGRADE_DONE']
     else:
         device.pnp_state = PNP_STATE['UPGRADE_NEEDED']
-        # if device.destination_free < device.target_image.size:
-        #     _mb = round(device.target_image.size / 1024 / 1024)
-        #     device.error_code = ERROR.ERROR_NO_FREE_SPACE
-        #     device.hard_error = True
 
 
 def read_device_status(filename: str):
@@ -216,8 +171,7 @@ def read_device_status(filename: str):
                 src_address=src_addr,
                 serial_number=serial_number,
                 platform=platform,
-                hw_rev=hw_rev,
-                current_job='urn:cisco:pnp:device-info'
+                hw_rev=hw_rev
             )
             device.pnp_state = PNP_STATE[pnp_state]
             device.version = current_ver
@@ -265,12 +219,11 @@ def update_device_status():
 
 
 app = Flask(__name__, template_folder='templates')
-# current_dir = Path(__file__)
 
 @app.route('/')
 @app.route('/index')
 def root():
-    return 'Hello Stream!'
+    return 'Hello World!'
 
 
 @app.route('/configs/<path:file>')
@@ -302,23 +255,18 @@ def pnp_work_request():
     if udi in devices.keys():
         device = devices[udi]
         if device.pnp_state == PNP_STATE['NEW_DEVICE']:
-            # log_info('PNPFLOW.NEW', SETTINGS.debug)
             device.pnp_state = PNP_STATE['INFO']
             _response = pnp_device_info(udi, correlator, 'all')
         elif device.pnp_state == PNP_STATE['CONFIG_START']:
-            # loginfo
             _response = pnp_config_upgrade(udi, correlator)
         elif device.pnp_state == PNP_STATE['CONFIG_RUN']:
             _response = pnp_cli_exec(udi, correlator, 'write memory')
         elif device.pnp_state == PNP_STATE['UPGRADE_NEEDED']:
-            # log_info('PNPFLOW.INFO', SETTINGS.debug)
             device.pnp_state = PNP_STATE['UPGRADE_INPROGRESS']
             _response = pnp_install_image(udi, correlator)
         elif device.pnp_state in [PNP_STATE['UPGRADE_RELOAD'], PNP_STATE['CONFIG_SAVE_STARTUP']]:
-            # loginfo
             _response = pnp_device_info(udi, correlator, 'all')
         elif device.pnp_state == PNP_STATE['UPGRADE_DONE']:
-            # loginfo
             _response = pnp_backoff(udi, correlator, 1)
     else:
         create_new_device(udi, src_addr)
@@ -328,10 +276,6 @@ def pnp_work_request():
     print(xmltodict.unparse(xmltodict.parse(_response), full_document=False, pretty=True))
     print('==============================================')
     return Response(_response, mimetype='text/xml')
-    #  configuration register ???
-
-    # print(xmltodict.unparse(xmltodict.parse(result_data), full_document=False, pretty=True))
-    # print('==============================================')
 
 @app.route('/pnp/WORK-RESPONSE', methods=['POST'])
 def pnp_work_response():
@@ -351,15 +295,12 @@ def pnp_work_response():
     device.ip_address = src_addr
     device.last_contact = strftime(pnp_env.time_format)
 
-    if job_type == 'urn:cisco:pnp:fault':  # error without job info (correlator):-(
-        device.error = data['pnp']['response']['fault']['detail']['XSVC-ERR:error']['XSVC-ERR:details']
+    if job_type == 'urn:cisco:pnp:fault':
+        return Response('')
     else:
         correlator = data['pnp']['response']['@correlator']
         job_status = int(data['pnp']['response']['@success'])
-        if job_status == 1:  # success
-            # if job_type not in ['urn:cisco:pnp:backoff']:
-            #     device.backoff = True
-            # device.error_count = 0
+        if job_status == 1:
             if job_type == 'urn:cisco:pnp:device-info':
                 if device.is_configured:
                     if device.pnp_state in [PNP_STATE['INFO'], PNP_STATE['CONFIG_SAVE_STARTUP'], PNP_STATE['UPGRADE_RELOAD']]:
@@ -372,46 +313,17 @@ def pnp_work_response():
             elif job_type == 'urn:cisco:pnp:image-install':
                 device.pnp_state = PNP_STATE['UPGRADE_RELOAD']
             elif job_type == 'urn:cisco:pnp:config-upgrade':
-                # device.pnp_flow = PNPFLOW.CONFIG_DOWN  # we don't reach this as we remove PNP before via EEM
                 device.is_configured = True
                 device.pnp_state = PNP_STATE['CONFIG_RUN']
-                # device.status = 'Finished. You can remove the device from the list :-)'
             elif job_type == 'urn:cisco:pnp:cli-exec':
                 device.pnp_state = PNP_STATE['CONFIG_SAVE_STARTUP']
             elif job_type == 'urn:cisco:pnp:backoff':
-                # device.pnp_flow = PNPFLOW.INFO
                 pass
-            # _response = pnp_bye(udi, correlator)
-            # # log_info(_response, SETTINGS.debug)
-            # print(xmltodict.unparse(xmltodict.parse(_response), full_document=False, pretty=True))
-            # print('==============================================')
-            # return Response(_response, mimetype='text/xml')
-        # elif job_status == 0:
-            # error_code = int(data['pnp']['response']['errorInfo']['errorCode'].split(' ')[-1])
-            # device.error_count += 1
-            # device.error_message = data['pnp']['response']['errorInfo']['errorMessage']
-            # device.error_code = error_code
-            # if error_code in [ERROR.PNP_ERROR_BAD_CHECKSUM, ERROR.PNP_ERROR_FILE_NOT_FOUND]:
-            #     device.hard_error = True
-            # return Response(pnp_bye(udi, correlator), mimetype='text/xml')
         _response = pnp_bye(udi, correlator)
-        # log_info(_response, SETTINGS.debug)
         print(xmltodict.unparse(xmltodict.parse(_response), full_document=False, pretty=True))
         print('==============================================')
         return Response(_response, mimetype='text/xml')
-    device.current_job = 'none'
-    return Response('')
 
-
-
-    # print(xmltodict.unparse(xmltodict.parse(result_data), full_document=False, pretty=True))
-    # print('==============================================')
-    # return Response(result_data, mimetype='text/xml')
-
-# @app.route('/configs/ztp.py', methods=['GET'])
-# def send_ztp_script():
-#     script_path = './configs/ztp.py'
-#     return send_file(script_path)
 
 if __name__ == '__main__':
 
@@ -431,4 +343,4 @@ if __name__ == '__main__':
     scheduler.add_job(update_device_status(pnp_env.device_status_filename), 'interval', minutes=0.5)
     scheduler.start()
 
-    app.run(host= '0.0.0.0', port=pnp_env.service_port) #debug=pnp_env.debug_mode)
+    app.run(host= '0.0.0.0', port=pnp_env.service_port)

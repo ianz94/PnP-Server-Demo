@@ -3,7 +3,7 @@
                 <reload>
                         <reason>PnP Software install</reason>
                         <delayIn>0</delayIn>
-                        <user>TOJO_AND_BEAN</user>
+                        <user>test</user>
                         <eraseConfig>true</eraseConfig>
                 </reload>
         </request>

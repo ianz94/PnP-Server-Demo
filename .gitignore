@@ -1,4 +1,5 @@
 .DS_Store
 configs/*
+!configs/default.cfg
 logs/*
 images/*
