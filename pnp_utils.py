@@ -1,3 +1,8 @@
+import logging
+from logging.handlers import RotatingFileHandler
+from sys import stdout
+
+
 PNP_STATE_LIST = [
     'NONE',
     'NEW_DEVICE',
@@ -38,3 +43,33 @@ class Device:
         self.image: str = ''
         self.target_image: SoftwareImage = None
         self.is_configured: bool = False
+
+def configure_logger(path: str, log_to_console: bool):
+    log_formatter = logging.Formatter(
+        '%(asctime)s :: %(levelname)s :: %(name)s :: %(module)s ::%(message)s')
+    log = logging.getLogger('root')
+    log.setLevel(logging.INFO)
+
+    log_file = path
+    # Write logs to a file, rotate it when it reaches 5MB
+    log_handler_file = RotatingFileHandler(
+        log_file,
+        mode='a',
+        maxBytes=5 * 1024 * 1024,
+        backupCount=10
+    )
+
+    log_handler_file.setFormatter(log_formatter)
+    log_handler_file.setLevel(logging.INFO)
+    log.addHandler(log_handler_file)
+
+    if log_to_console:
+        log_handler_console = logging.StreamHandler(stdout)
+        log_handler_console.setFormatter(log_formatter)
+        log_handler_console.setLevel(logging.INFO)
+        log.addHandler(log_handler_console)
+
+
+def log_info(message: str):
+    log = logging.getLogger('root')
+    log.info(message)

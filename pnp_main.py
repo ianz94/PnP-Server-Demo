@@ -5,7 +5,7 @@ from requests import head
 import xmltodict
 import csv
 import pnp_env
-from pnp_utils import PNP_STATE_LIST, PNP_STATE, Device, SoftwareImage
+from pnp_utils import PNP_STATE_LIST, PNP_STATE, Device, SoftwareImage, configure_logger, log_info
 
 def pnp_device_info(udi: str, correlator: str, info_type: str) -> str:
     # info_type can be one of:
@@ -15,7 +15,9 @@ def pnp_device_info(udi: str, correlator: str, info_type: str) -> str:
         'correlator': correlator,
         'info_type': info_type
     }
-    return render_template('device_info.xml', **jinja_context)
+    _template = render_template('device_info.xml', **jinja_context)
+    log_info(_template)
+    return _template
 
 
 def pnp_install_image(udi: str, correlator: str) -> str:
@@ -32,9 +34,10 @@ def pnp_install_image(udi: str, correlator: str) -> str:
             'destination': 'bootflash'
         }
         _template = render_template('image_install.xml', **jinja_context)
+        log_info(_template)
         return _template
     else:
-        print('image does not exist!!!!!!')
+        log_info(f'Image file {pnp_env.image_url}/{device.target_image.image} does not exist')
         return ''
 
 
@@ -47,10 +50,10 @@ def pnp_config_upgrade(udi: str, correlator: str) -> str:
             cfg_file = pnp_env.default_cfg_filename
             response = head(f'{pnp_env.config_url}/{cfg_file}')
             if response.status_code != 200:  # default.cfg also not found
-                print('config does not exist!!!!!!')
-                return
+                log_info(f'Config file {pnp_env.config_url}/{cfg_file} does not exist')
+                return ''
         else:
-            print('config does not exist!!!!!!')
+            log_info(f'Config file {pnp_env.config_url}/{cfg_file} does not exist')
             return ''
     device.pnp_state = PNP_STATE['CONFIG_START']
     jinja_context = {
@@ -60,6 +63,7 @@ def pnp_config_upgrade(udi: str, correlator: str) -> str:
         'config_filename': cfg_file,
     }
     _template = render_template('config_upgrade.xml', **jinja_context)
+    log_info(_template)
     return _template
 
 
@@ -69,7 +73,9 @@ def pnp_cli_exec(udi: str, correlator: str, command: str) -> str:
         'correlator': correlator,
         'command': command
     }
-    return render_template('cli_exec.xml', **jinja_context)
+    _template = render_template('cli_exec.xml', **jinja_context)
+    log_info(_template)
+    return _template
 
 
 def pnp_backoff(udi: str, correlator: str, minutes: int) -> str:
@@ -83,6 +89,7 @@ def pnp_backoff(udi: str, correlator: str, minutes: int) -> str:
         'hours': hours,
     }
     _template = render_template('backoff.xml', **jinja_context)
+    log_info(_template)
     return _template
 
 
@@ -92,6 +99,7 @@ def pnp_bye(udi: str, correlator: str) -> str:
         'correlator': correlator,
     }
     _template = render_template('bye.xml', **jinja_context)
+    log_info(_template)
     return _template
 
 
@@ -243,58 +251,55 @@ def pnp_hello():
 
 @app.route('/pnp/WORK-REQUEST', methods=['POST'])
 def pnp_work_request():
-    print('\n\n\n==============================================')
-    print('From PnP Agent to PnP Server:')
-    src_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
     data = xmltodict.parse(request.data)
-    print(xmltodict.unparse(data, full_document=False, pretty=True))
-    print('From PnP Server to PnP Agent:')
+    log_info(f'Receiving pnp request msg:\n{xmltodict.unparse(data, full_document=False, pretty=True)}')
     correlator = data['pnp']['info']['@correlator']
     udi = data['pnp']['@udi']
-
+    log_info(f'Responding to device {udi} -\n')
     if udi in devices.keys():
         device = devices[udi]
         if device.pnp_state == PNP_STATE['NEW_DEVICE']:
+            log_info(f'{udi} - New device showing up, check its device info')
             device.pnp_state = PNP_STATE['INFO']
             _response = pnp_device_info(udi, correlator, 'all')
         elif device.pnp_state == PNP_STATE['CONFIG_START']:
+            log_info(f'{udi} - Update configuration')
             _response = pnp_config_upgrade(udi, correlator)
         elif device.pnp_state == PNP_STATE['CONFIG_RUN']:
+            log_info(f'{udi} - Save running-config as startup-config')
             _response = pnp_cli_exec(udi, correlator, 'write memory')
         elif device.pnp_state == PNP_STATE['UPGRADE_NEEDED']:
+            log_info(f'{udi} - Need upgrading, now transfer new image to device')
             device.pnp_state = PNP_STATE['UPGRADE_INPROGRESS']
             _response = pnp_install_image(udi, correlator)
         elif device.pnp_state in [PNP_STATE['UPGRADE_RELOAD'], PNP_STATE['CONFIG_SAVE_STARTUP']]:
+            log_info(f'{udi} - Check its device info')
             _response = pnp_device_info(udi, correlator, 'all')
         elif device.pnp_state == PNP_STATE['UPGRADE_DONE']:
+            log_info(f'{udi} - All done')
             _response = pnp_backoff(udi, correlator, 1)
     else:
+        src_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
         create_new_device(udi, src_addr)
+        log_info(f'{udi} - New device showing up, check its device info')
         devices[udi].pnp_state = PNP_STATE['INFO']
         _response = pnp_device_info(udi, correlator, 'all')
-    
-    print(xmltodict.unparse(xmltodict.parse(_response), full_document=False, pretty=True))
-    print('==============================================')
     return Response(_response, mimetype='text/xml')
 
 @app.route('/pnp/WORK-RESPONSE', methods=['POST'])
 def pnp_work_response():
-    print('\n\n\n==============================================')
-    print('From PnP Agent to PnP Server:')
     src_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
     data = xmltodict.parse(request.data)
-    print(xmltodict.unparse(data, full_document=False, pretty=True))
-    print('From PnP Server to PnP Agent:')
+    log_info(f'Received pnp response msg:\n{xmltodict.unparse(data, full_document=False, pretty=True)}')
     correlator = data['pnp']['response']['@correlator']
     udi = data['pnp']['@udi']
+    log_info(f'Responding to device {udi} -\n')
     job_type = data['pnp']['response']['@xmlns']
     if udi not in devices.keys():
         create_new_device(udi, src_addr)
-
     device = devices[udi]
     device.ip_address = src_addr
     device.last_contact = strftime(pnp_env.time_format)
-
     if job_type == 'urn:cisco:pnp:fault':
         return Response('')
     else:
@@ -320,8 +325,6 @@ def pnp_work_response():
             elif job_type == 'urn:cisco:pnp:backoff':
                 pass
         _response = pnp_bye(udi, correlator)
-        print(xmltodict.unparse(xmltodict.parse(_response), full_document=False, pretty=True))
-        print('==============================================')
         return Response(_response, mimetype='text/xml')
 
 
@@ -338,9 +341,30 @@ if __name__ == '__main__':
     )
     images[test_image.version] = test_image
 
+
+    if pnp_env.pnp_server_ip == '':
+        print(f'pnp server ip address not set yet, check pnp_env.py')
+        exit(1)
+    response = head(f'{pnp_env.pnp_server_ip}:{pnp_env.service_port}/pnp/HELLO')
+    if response.status_code != 200:
+        print(f'pnp server not set up properly, check pnp_env.py & pnp_main.py')
+        exit(1)
+
+    configure_logger(pnp_env.log_file, pnp_env.log_to_console)
+    log_info('Start Logging:\n')
+
     read_device_status(pnp_env.device_status_filename)
     scheduler = BackgroundScheduler()
     scheduler.add_job(update_device_status(pnp_env.device_status_filename), 'interval', minutes=0.5)
     scheduler.start()
+
+    print()
+    print(f'Running PnP server. Stop with ctrl+c')
+    print()
+    print(f'Bind to IP-address      : {pnp_env.pnp_server_ip}')
+    print(f'Listen on port          : {pnp_env.service_port}')
+    print(f'Image file(s) base URL  : {pnp_env.image_url}')
+    print(f'Config file(s) base URL : {pnp_env.config_url}')
+    print()
 
     app.run(host= '0.0.0.0', port=pnp_env.service_port)
