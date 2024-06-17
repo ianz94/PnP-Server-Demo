@@ -45,9 +45,12 @@ class Device:
         self.is_configured: bool = False
 
 def configure_logger(path: str, log_to_console: bool):
-    log_formatter = logging.Formatter(
-        '%(asctime)s :: %(levelname)s :: %(name)s :: %(module)s ::%(message)s')
-    log = logging.getLogger('root')
+    # # Disable FLASK console output
+    logging.getLogger("werkzeug").disabled = True
+    
+    # Define our own logger
+    log_formatter = logging.Formatter('%(asctime)s :: %(name)s :: %(message)s\n')
+    log = logging.getLogger('pnp_server')
     log.setLevel(logging.INFO)
 
     log_file = path
@@ -71,5 +74,5 @@ def configure_logger(path: str, log_to_console: bool):
 
 
 def log_info(message: str):
-    log = logging.getLogger('root')
+    log = logging.getLogger('pnp_server')
     log.info(message)

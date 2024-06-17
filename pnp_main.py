@@ -195,12 +195,12 @@ def format_fixed_width(data, widths):
     return formatted_data
 
 
-def update_device_status():
+def update_device_status(filename: str):
     # Fixed width for each column
-    column_widths = [15, 16, 9, 16, 24, 24, 16, 16, 20]
+    column_widths = [15, 16, 9, 16, 24, 24, 22, 22, 20]
 
     # Write CSV file with fixed-width formatting
-    with open('output.csv', 'w', newline='') as csvfile:
+    with open(filename, 'w', newline='') as csvfile:
         csv_writer = csv.writer(csvfile, delimiter='|')
         csv_writer.writerow(format_fixed_width(['Serial Number',
                                                 'Platform',
@@ -255,7 +255,7 @@ def pnp_work_request():
     log_info(f'Receiving pnp request msg:\n{xmltodict.unparse(data, full_document=False, pretty=True)}')
     correlator = data['pnp']['info']['@correlator']
     udi = data['pnp']['@udi']
-    log_info(f'Responding to device {udi} -\n')
+    log_info(f'Responding to device {udi} -')
     if udi in devices.keys():
         device = devices[udi]
         if device.pnp_state == PNP_STATE['NEW_DEVICE']:
@@ -277,7 +277,7 @@ def pnp_work_request():
             _response = pnp_device_info(udi, correlator, 'all')
         elif device.pnp_state == PNP_STATE['UPGRADE_DONE']:
             log_info(f'{udi} - All done')
-            _response = pnp_backoff(udi, correlator, 1)
+            _response = pnp_backoff(udi, correlator, 20)
     else:
         src_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
         create_new_device(udi, src_addr)
@@ -293,7 +293,7 @@ def pnp_work_response():
     log_info(f'Received pnp response msg:\n{xmltodict.unparse(data, full_document=False, pretty=True)}')
     correlator = data['pnp']['response']['@correlator']
     udi = data['pnp']['@udi']
-    log_info(f'Responding to device {udi} -\n')
+    log_info(f'Responding to device {udi} -')
     job_type = data['pnp']['response']['@xmlns']
     if udi not in devices.keys():
         create_new_device(udi, src_addr)
@@ -345,17 +345,13 @@ if __name__ == '__main__':
     if pnp_env.pnp_server_ip == '':
         print(f'pnp server ip address not set yet, check pnp_env.py')
         exit(1)
-    response = head(f'{pnp_env.pnp_server_ip}:{pnp_env.service_port}/pnp/HELLO')
-    if response.status_code != 200:
-        print(f'pnp server not set up properly, check pnp_env.py & pnp_main.py')
-        exit(1)
 
     configure_logger(pnp_env.log_file, pnp_env.log_to_console)
-    log_info('Start Logging:\n')
+    log_info('Start Logging:')
 
     read_device_status(pnp_env.device_status_filename)
     scheduler = BackgroundScheduler()
-    scheduler.add_job(update_device_status(pnp_env.device_status_filename), 'interval', minutes=0.5)
+    scheduler.add_job(update_device_status, 'interval', minutes=0.5, args=[pnp_env.device_status_filename])
     scheduler.start()
 
     print()
