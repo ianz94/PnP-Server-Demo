@@ -78,6 +78,26 @@ def pnp_cli_exec(udi: str, correlator: str, command: str) -> str:
     return _template
 
 
+def pnp_transfer_file(udi: str, correlator: str) -> str:
+    device = devices[udi]
+    device.pnp_state = PNP_STATE['FILE_TRANSFER_START']
+    response = head(f'{pnp_env.file_url}/{pnp_env.file_name}')
+    if response.status_code == 200:
+        jinja_context = {
+            'udi': udi,
+            'correlator': correlator,
+            'base_url': pnp_env.file_url,
+            'file_name': pnp_env.file_name,
+            'destination': 'bootflash'
+        }
+        _template = render_template('image_install.xml', **jinja_context)
+        log_info(_template)
+        return _template
+    else:
+        log_info(f'File {pnp_env.file_url}/{pnp_env.file_name} does not exist')
+        return ''
+
+
 def pnp_backoff(udi: str, correlator: str, minutes: int) -> str:
     seconds = 0
     hours = 0
@@ -168,7 +188,9 @@ def read_device_status(filename: str):
             last_contact  = row[5].strip()
             current_ver   = row[6].strip()
             target_ver    = row[7].strip()
-            pnp_state     = row[8].strip()
+            is_configured = row[8].strip()
+            is_file_trans = row[9].strip()
+            pnp_state     = row[10].strip()
 
             # sample udi="PID:C1131-8PWB,VID:V01,SN:FGL2548L0AW"
             udi = f'PID:{platform},VID:{hw_rev},SN:{serial_number}'
@@ -184,6 +206,8 @@ def read_device_status(filename: str):
             device.pnp_state = PNP_STATE[pnp_state]
             device.version = current_ver
             device.target_image = images[target_ver]
+            device.is_configured = (is_configured == 'Done')
+            device.is_file_transferred = (is_file_trans == 'Done')
             devices[udi] = device
 
 
@@ -197,7 +221,7 @@ def format_fixed_width(data, widths):
 
 def update_device_status(filename: str):
     # Fixed width for each column
-    column_widths = [15, 16, 9, 16, 24, 24, 22, 22, 20]
+    column_widths = [15, 16, 9, 16, 24, 24, 22, 22, 15, 15, 20]
 
     # Write CSV file with fixed-width formatting
     with open(filename, 'w', newline='') as csvfile:
@@ -210,6 +234,8 @@ def update_device_status(filename: str):
                                                 'Last Contact',
                                                 'Current Version',
                                                 'Target Version',
+                                                'Config Update',
+                                                'File Transfer',
                                                 'Device State'],
                                                 column_widths))
         for device in devices.values():
@@ -221,6 +247,8 @@ def update_device_status(filename: str):
                                                 device.last_contact,
                                                 device.version,
                                                 device.target_image.version,
+                                                'Done' if device.is_configured else 'Not yet',
+                                                'Done' if device.is_file_transferred else 'Not yet',
                                                 PNP_STATE_LIST[device.pnp_state]],
                                                 column_widths)
             csv_writer.writerow(formatted_row)
@@ -242,6 +270,11 @@ def serve_configs(file):
 @app.route('/images/<path:file>')
 def serve_sw_images(file):
     return send_from_directory('images', file, mimetype='application/octet-stream')
+
+
+@app.route('/files/<path:file>')
+def serve_files(file):
+    return send_from_directory('files', file, mimetype='application/octet-stream')
 
 
 @app.route('/pnp/HELLO')
@@ -275,9 +308,14 @@ def pnp_work_request():
         elif device.pnp_state in [PNP_STATE['UPGRADE_RELOAD'], PNP_STATE['CONFIG_SAVE_STARTUP']]:
             log_info(f'{udi} - Check its device info')
             _response = pnp_device_info(udi, correlator, 'all')
-        elif device.pnp_state == PNP_STATE['UPGRADE_DONE']:
-            log_info(f'{udi} - All done')
-            _response = pnp_backoff(udi, correlator, 20)
+        elif device.pnp_state in [PNP_STATE['UPGRADE_DONE'], PNP_STATE['FILE_TRANSFER_DONE']]:
+            if device.is_file_transferred:
+                log_info(f'{udi} - All done')
+                device.pnp_state = PNP_STATE['FINISHED']
+                _response = pnp_backoff(udi, correlator, 20)
+            else:
+                log_info(f'{udi} - Now start transferring file into device bootflash')
+                _response = pnp_transfer_file(udi, correlator)
     else:
         src_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
         create_new_device(udi, src_addr)
@@ -322,6 +360,9 @@ def pnp_work_response():
                 device.pnp_state = PNP_STATE['CONFIG_RUN']
             elif job_type == 'urn:cisco:pnp:cli-exec':
                 device.pnp_state = PNP_STATE['CONFIG_SAVE_STARTUP']
+            elif job_type == 'urn:cisco:pnp:file-transfer':
+                device.is_file_transferred = True
+                device.pnp_state = PNP_STATE['FILE_TRANSFER_DONE']
             elif job_type == 'urn:cisco:pnp:backoff':
                 pass
         _response = pnp_bye(udi, correlator)

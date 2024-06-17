@@ -1,0 +1,14 @@
+<pnp xmlns="urn:cisco:pnp" version="1.0" udi="{{ udi }}">
+    <request xmlns="urn:cisco:pnp:file-transfer" correlator="{{ correlator }}">
+        <fileTransfer>
+            <copy>
+                <source>
+                    <location>{{ base_url }}/{{ file_name }}</location>
+                </source>
+                <destination>
+                    <location>{{ destination }}:{{ file_name }}</location>
+                </destination>
+            </copy>
+        </fileTransfer>
+    </request>
+</pnp>

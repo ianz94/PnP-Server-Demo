@@ -3,3 +3,5 @@ configs/*
 !configs/default.cfg
 logs/*
 images/*
+files/*
+!*/.gitkeep

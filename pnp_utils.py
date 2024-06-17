@@ -14,6 +14,8 @@ PNP_STATE_LIST = [
     'UPGRADE_INPROGRESS',
     'UPGRADE_RELOAD',
     'UPGRADE_DONE',
+    'FILE_TRANSFER_START',
+    'FILE_TRANSFER_DONE',
     'FINISHED'
 ]
 PNP_STATE = {STR:IDX for IDX,STR in enumerate(PNP_STATE_LIST)}
@@ -43,6 +45,7 @@ class Device:
         self.image: str = ''
         self.target_image: SoftwareImage = None
         self.is_configured: bool = False
+        self.is_file_transferred: bool = False
 
 def configure_logger(path: str, log_to_console: bool):
     # # Disable FLASK console output
