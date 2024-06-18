@@ -67,6 +67,17 @@ def pnp_config_upgrade(udi: str, correlator: str) -> str:
     return _template
 
 
+def pnp_cli_config(udi: str, correlator: str, command: str) -> str:
+    jinja_context = {
+        'udi': udi,
+        'correlator': correlator,
+        'command': command
+    }
+    _template = render_template('cli_config.xml', **jinja_context)
+    log_info(_template)
+    return _template
+
+
 def pnp_cli_exec(udi: str, correlator: str, command: str) -> str:
     jinja_context = {
         'udi': udi,
@@ -90,7 +101,7 @@ def pnp_transfer_file(udi: str, correlator: str) -> str:
             'file_name': pnp_env.file_name,
             'destination': 'bootflash'
         }
-        _template = render_template('image_install.xml', **jinja_context)
+        _template = render_template('file_transfer.xml', **jinja_context)
         log_info(_template)
         return _template
     else:
@@ -298,6 +309,9 @@ def pnp_work_request():
         elif device.pnp_state == PNP_STATE['CONFIG_START']:
             log_info(f'{udi} - Update configuration')
             _response = pnp_config_upgrade(udi, correlator)
+        elif device.pnp_state == PNP_STATE['CONFIG_REG']:
+            log_info(f'{udi} - Set the device configuration register')
+            _response = pnp_cli_config(udi, correlator, f'config-register {pnp_env.isr1k_config_register}')
         elif device.pnp_state == PNP_STATE['CONFIG_RUN']:
             log_info(f'{udi} - Save running-config as startup-config')
             _response = pnp_cli_exec(udi, correlator, 'write memory')
@@ -357,6 +371,8 @@ def pnp_work_response():
                 device.pnp_state = PNP_STATE['UPGRADE_RELOAD']
             elif job_type == 'urn:cisco:pnp:config-upgrade':
                 device.is_configured = True
+                device.pnp_state = PNP_STATE['CONFIG_REG']
+            elif job_type == 'urn:cisco:pnp:cli-config':
                 device.pnp_state = PNP_STATE['CONFIG_RUN']
             elif job_type == 'urn:cisco:pnp:cli-exec':
                 device.pnp_state = PNP_STATE['CONFIG_SAVE_STARTUP']

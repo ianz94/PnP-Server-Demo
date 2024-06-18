@@ -7,9 +7,11 @@ default_cfg_exists = True
 default_cfg_filename = 'default.cfg'
 
 file_url = 'http://' + pnp_server_ip + '/files'
-file_name = 'ISR1K WLAN SDWAN Integration.mp4'
+file_name = 'ISR1K_WLAN_SDWAN_Integration.mp4'
 
 device_status_filename = 'DEVICE_STATUS.csv'
+
+isr1k_config_register = '0x2102'
 
 # Logging
 log_file = 'logs/pnp_debug.log'
