@@ -12,12 +12,5 @@
                 </destination>
             </copy>
         </image>
-        <!-- <reload>
-            <reason>pnp image installation</reason>
-            <delayIn>{{ delay }}</delayIn>
-            <user>pnp-install-image</user>
-            <eraseConfig>true</eraseConfig>
-            <saveConfig>false</saveConfig>
-        </reload> -->
     </request>
 </pnp>

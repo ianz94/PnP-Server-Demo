@@ -1,7 +1,11 @@
 pnp_server_ip = ''
-pnp_server_ip = '10.82.194.80'
+pnp_server_ip = '10.82.230.241'
 service_port = '80'
+
 image_url = 'http://' + pnp_server_ip + '/images'
+image_filename = ''
+image_filename = 'c1100-universalk9.17.14.01a.SPA.bin'
+
 config_url = 'http://' + pnp_server_ip + '/configs'
 default_cfg_exists = True
 default_cfg_filename = 'default.cfg'

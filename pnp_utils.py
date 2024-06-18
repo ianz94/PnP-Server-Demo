@@ -1,4 +1,5 @@
 import logging
+import hashlib
 from logging.handlers import RotatingFileHandler
 from sys import stdout
 
@@ -23,11 +24,9 @@ PNP_STATE = {STR:IDX for IDX,STR in enumerate(PNP_STATE_LIST)}
 
 
 class SoftwareImage:
-    def __init__(self, image: str, version: str, md5: str, size: int):
+    def __init__(self, image: str):
         self.image: str = image
-        self.version: str = version
-        self.md5: str = md5
-        self.size: int = size
+        self.md5: str = ''
 
 
 class Device:
@@ -80,3 +79,15 @@ def configure_logger(path: str, log_to_console: bool):
 def log_info(message: str):
     log = logging.getLogger('pnp_server')
     log.info(message)
+
+
+def calculate_md5(filepath):
+    try:
+        with open(filepath, mode='rb') as file:
+            md5_hash = hashlib.md5()
+            while chunk := file.read(8192):
+                md5_hash.update(chunk)
+        return md5_hash.hexdigest()
+    except FileNotFoundError:
+        print(f"The file '{filepath}' does not exist!")
+        exit(1)

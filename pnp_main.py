@@ -5,7 +5,7 @@ from requests import head
 import xmltodict
 import csv
 import pnp_env
-from pnp_utils import PNP_STATE_LIST, PNP_STATE, Device, SoftwareImage, configure_logger, log_info
+from pnp_utils import PNP_STATE_LIST, PNP_STATE, Device, SoftwareImage, configure_logger, log_info, calculate_md5
 
 def pnp_device_info(udi: str, correlator: str, info_type: str) -> str:
     # info_type can be one of:
@@ -151,20 +151,7 @@ def create_new_device(udi: str, src_addr: str):
         hw_rev=hw_rev
     )
     devices[udi].pnp_state = PNP_STATE['NEW_DEVICE']
-    devices[udi].target_image = test_image
-    # device = devices[udi]
-    # device.backoff = True
-    # for image, image_data in IMAGES.images.items():
-    #     if platform in image_data['models']:
-    #         device.target_image = SoftwareImage(
-    #             image=image,
-    #             version=image_data['version'],
-    #             md5=image_data['md5'],
-    #             size=image_data['size']
-    #         )
-    # if not device.target_image:
-    #     device.error_code = ERROR.ERROR_NO_PLATFORM
-    #     device.hard_error = True
+    devices[udi].target_image = images[pnp_env.image_filename]
 
 
 def update_device_info(data: dict):
@@ -177,7 +164,7 @@ def update_device_info(data: dict):
 
 def check_update(udi: str):
     device = devices[udi]
-    if device.version == device.target_image.version:
+    if device.image == device.target_image.image:
         device.pnp_state = PNP_STATE['UPGRADE_DONE']
     else:
         device.pnp_state = PNP_STATE['UPGRADE_NEEDED']
@@ -198,7 +185,7 @@ def read_device_status(filename: str):
             first_seen    = row[4].strip()
             last_contact  = row[5].strip()
             current_ver   = row[6].strip()
-            target_ver    = row[7].strip()
+            target_image  = row[7].strip()
             is_configured = row[8].strip()
             is_file_trans = row[9].strip()
             pnp_state     = row[10].strip()
@@ -216,7 +203,7 @@ def read_device_status(filename: str):
             )
             device.pnp_state = PNP_STATE[pnp_state]
             device.version = current_ver
-            device.target_image = images[target_ver]
+            device.target_image = images[target_image]
             device.is_configured = (is_configured == 'Done')
             device.is_file_transferred = (is_file_trans == 'Done')
             devices[udi] = device
@@ -232,7 +219,7 @@ def format_fixed_width(data, widths):
 
 def update_device_status(filename: str):
     # Fixed width for each column
-    column_widths = [15, 16, 9, 16, 24, 24, 22, 22, 15, 15, 20]
+    column_widths = [15, 16, 9, 16, 24, 24, 22, 40, 15, 15, 20]
 
     # Write CSV file with fixed-width formatting
     with open(filename, 'w', newline='') as csvfile:
@@ -244,7 +231,7 @@ def update_device_status(filename: str):
                                                 'First Seen',
                                                 'Last Contact',
                                                 'Current Version',
-                                                'Target Version',
+                                                'Target Image',
                                                 'Config Update',
                                                 'File Transfer',
                                                 'Device State'],
@@ -257,7 +244,7 @@ def update_device_status(filename: str):
                                                 device.first_seen,
                                                 device.last_contact,
                                                 device.version,
-                                                device.target_image.version,
+                                                device.target_image.image,
                                                 'Done' if device.is_configured else 'Not yet',
                                                 'Done' if device.is_file_transferred else 'Not yet',
                                                 PNP_STATE_LIST[device.pnp_state]],
@@ -390,13 +377,9 @@ if __name__ == '__main__':
     devices = {}
     images  = {}
 
-    test_image = SoftwareImage(
-        image='c1100-universalk9.17.14.01a.SPA.bin',
-        version='17.14.1a',
-        md5='ac8c06a8431d26b723c92f0aa245bfe7',
-        size = 716699088
-    )
-    images[test_image.version] = test_image
+    target_image = SoftwareImage(pnp_env.image_filename)
+    target_image.md5 = calculate_md5(f'images/{pnp_env.image_filename}')
+    images[target_image.image] = target_image
 
 
     if pnp_env.pnp_server_ip == '':
