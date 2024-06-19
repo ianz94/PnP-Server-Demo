@@ -63,7 +63,12 @@ $ sudo systemctl status isc-dhcp-server
 ```
 
 ### Step 3
-Git clone this repo into the PnP server. 
+Git clone this repo into the PnP server.
+
+Install all of the modules that this repo depends on:
+```
+pip3 install -r requirements.txt
+```
 
 Edit *pnp_env.py* to set up the environment variables (server IP address, config file name, name of the file you want to transfer etc).
 
