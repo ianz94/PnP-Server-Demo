@@ -306,9 +306,13 @@ def pnp_work_request():
             log_info(f'{udi} - Need upgrading, now transfer new image to device')
             device.pnp_state = PNP_STATE['UPGRADE_INPROGRESS']
             _response = pnp_install_image(udi, correlator)
-        elif device.pnp_state in [PNP_STATE['UPGRADE_RELOAD'], PNP_STATE['CONFIG_SAVE_STARTUP']]:
+        elif device.pnp_state in [PNP_STATE['CONFIG_SAVE_STARTUP'], PNP_STATE['UPGRADE_RELOADING']]:
             log_info(f'{udi} - Check its device info')
             _response = pnp_device_info(udi, correlator, 'all')
+        elif device.pnp_state == PNP_STATE['UPGRADE_RELOAD_NEEDED']:
+            log_info(f'{udi} - New image has been transferred, now backoff & reload yourself before contacting server')
+            device.pnp_state = PNP_STATE['UPGRADE_RELOADING']
+            _response = pnp_backoff(udi, correlator, 2)
         elif device.pnp_state in [PNP_STATE['UPGRADE_DONE'], PNP_STATE['FILE_TRANSFER_DONE']]:
             if device.is_file_transferred:
                 log_info(f'{udi} - All done')
@@ -347,7 +351,7 @@ def pnp_work_response():
         if job_status == 1:
             if job_type == 'urn:cisco:pnp:device-info':
                 if device.is_configured:
-                    if device.pnp_state in [PNP_STATE['INFO'], PNP_STATE['CONFIG_SAVE_STARTUP'], PNP_STATE['UPGRADE_RELOAD']]:
+                    if device.pnp_state in [PNP_STATE['INFO'], PNP_STATE['CONFIG_SAVE_STARTUP'], PNP_STATE['UPGRADE_RELOAD_NEEDED'], PNP_STATE['UPGRADE_RELOADING']]:
                         update_device_info(data)
                         check_update(udi)
                     else:
@@ -355,7 +359,7 @@ def pnp_work_response():
                 else:
                     device.pnp_state = PNP_STATE['CONFIG_START']
             elif job_type == 'urn:cisco:pnp:image-install':
-                device.pnp_state = PNP_STATE['UPGRADE_RELOAD']
+                device.pnp_state = PNP_STATE['UPGRADE_RELOAD_NEEDED']
             elif job_type == 'urn:cisco:pnp:config-upgrade':
                 device.is_configured = True
                 device.pnp_state = PNP_STATE['CONFIG_REG']
@@ -368,6 +372,12 @@ def pnp_work_response():
                 device.pnp_state = PNP_STATE['FILE_TRANSFER_DONE']
             elif job_type == 'urn:cisco:pnp:backoff':
                 pass
+        else:
+            if job_type == 'urn:cisco:pnp:image-install':
+                # If failed to the install the image,
+                # we should check the device info again,
+                # in case it has already be done
+                device.pnp_state = PNP_STATE['UPGRADE_RELOADING']
         _response = pnp_bye(udi, correlator)
         return Response(_response, mimetype='text/xml')
 
