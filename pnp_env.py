@@ -22,7 +22,8 @@ default_cfg_filename = 'default.cfg'
 #4. Put the file which you want to transfer under ./files folder
 #   Write its filename. For example file_name = 'guestshell.17.09.01a.tar'
 file_url = 'http://' + pnp_server_ip + '/files'
-file_name = ''
+guestshell_tarball_filename = ''
+python_script_filename      = ''
 
 # Name of the status panel which you can check out the progress of each device
 device_status_filename = 'DEVICE_STATUS.csv'
