@@ -7,18 +7,16 @@ from sys import stdout
 PNP_STATE_LIST = [
     'NONE',
     'NEW_DEVICE',
-    'INFO',
-    'CONFIG_START',
-    'CONFIG_RUN',
     'CONFIG_REG',
-    'CONFIG_SAVE_STARTUP',
     'UPGRADE_NEEDED',
     'UPGRADE_INPROGRESS',
     'UPGRADE_RELOAD_NEEDED',
     'UPGRADE_RELOADING',
     'UPGRADE_DONE',
-    'FILE_TRANSFER_START',
-    'FILE_TRANSFER_DONE',
+    'GS_TARBALL_TRANSFER',
+    'PY_SCRIPT_TRANSFER',
+    'CONFIG_START',
+    'CONFIG_SAVE_STARTUP',
     'FINISHED'
 ]
 PNP_STATE = {STR:IDX for IDX,STR in enumerate(PNP_STATE_LIST)}
@@ -46,7 +44,8 @@ class Device:
         self.image: str = ''
         self.target_image: SoftwareImage = None
         self.is_configured: bool = False
-        self.is_file_transferred: bool = False
+        self.has_GS_tarball: bool = False
+        self.has_PY_script: bool = False
 
 def configure_logger(path: str, log_to_console: bool):
     # # Disable FLASK console output
