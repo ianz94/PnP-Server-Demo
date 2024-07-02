@@ -90,7 +90,7 @@ def pnp_cli_exec(udi: str, correlator: str, command: str) -> str:
 
 
 def pnp_transfer_file(udi: str, file_name: str, correlator: str) -> str:
-    response = head(f'{pnp_env.file_url}/{pnp_env.file_name}')
+    response = head(f'{pnp_env.file_url}/{file_name}')
     if response.status_code == 200:
         jinja_context = {
             'udi': udi,
@@ -103,7 +103,7 @@ def pnp_transfer_file(udi: str, file_name: str, correlator: str) -> str:
         log_info(_template)
         return _template
     else:
-        log_info(f'File {pnp_env.file_url}/{pnp_env.file_name} does not exist')
+        log_info(f'File {pnp_env.file_url}/{file_name} does not exist')
         return ''
 
 
@@ -219,7 +219,7 @@ def format_fixed_width(data, widths):
 
 def update_device_status(filename: str):
     # Fixed width for each column
-    column_widths = [15, 16, 9, 16, 24, 24, 22, 40, 15, 15, 15, 20]
+    column_widths = [15, 16, 9, 16, 24, 24, 22, 40, 20, 15, 15, 20]
 
     # Write CSV file with fixed-width formatting
     with open(filename, 'w', newline='') as csvfile:
@@ -294,7 +294,10 @@ def pnp_work_request():
         if device.pnp_state == PNP_STATE['NEW_DEVICE']:
             log_info(f'{udi} - New device showing up, set its config register')
             _response = pnp_cli_config(udi, correlator, f'config-register {pnp_env.isr1k_config_register}')
-        elif device.pnp_state in [PNP_STATE['CONFIG_REG'], PNP_STATE['UPGRADE_RELOADING']]:
+        elif device.pnp_state == PNP_STATE['CONFIG_REG']:
+            log_info(f'{udi} - Save config register & pnp config')
+            _response = pnp_cli_exec(udi, correlator, 'write memory')
+        elif device.pnp_state in [PNP_STATE['CHECK_IMAGE_VER'], PNP_STATE['UPGRADE_RELOADING']]:
             log_info(f'{udi} - Check its device info')
             _response = pnp_device_info(udi, correlator, 'all')
         elif device.pnp_state == PNP_STATE['UPGRADE_NEEDED']:
@@ -329,9 +332,12 @@ def pnp_work_request():
         elif device.pnp_state == PNP_STATE['RUN_EVENT_MANAGER']:
             log_info(f'{udi} - Activate guestshell environment via EEM')
             _response = pnp_cli_exec(udi, correlator, f'event manager run {pnp_env.EEM_event_name}')
-        elif device.pnp_state == PNP_STATE['CHECK_GUESTSHELL']:
+        elif device.pnp_state == PNP_STATE['WAIT_FOR_GUESTSHELL']:
             log_info(f'{udi} - Wait 1 min for guestshell to be enabled')
             _response = pnp_backoff(udi, correlator, 1)
+        elif device.pnp_state == PNP_STATE['CHECK_GUESTSHELL']:
+            log_info(f'{udi} - Check if the guestshell env is running')
+            _response = pnp_cli_exec(udi, correlator, 'show app-hosting list')
         elif device.pnp_state == PNP_STATE['RUN_PY_SCRIPT']:
             log_info(f'{udi} - Start guestshell python script')
             _response = pnp_cli_exec(udi, correlator, f'guestshell run {pnp_env.python_script_filename}')
@@ -368,7 +374,7 @@ def pnp_work_response():
             if job_type == 'urn:cisco:pnp:cli-config':
                 device.pnp_state = PNP_STATE['CONFIG_REG']
             elif job_type == 'urn:cisco:pnp:device-info':
-                if device.pnp_state in [PNP_STATE['CONFIG_REG'], PNP_STATE['UPGRADE_RELOAD_NEEDED'], PNP_STATE['UPGRADE_RELOADING']]:
+                if device.pnp_state in [PNP_STATE['CHECK_IMAGE_VER'], PNP_STATE['UPGRADE_RELOAD_NEEDED'], PNP_STATE['UPGRADE_RELOADING']]:
                     update_device_info(data)
                     check_update(udi)
                 else:
@@ -388,17 +394,27 @@ def pnp_work_response():
             elif job_type == 'urn:cisco:pnp:config-upgrade':
                 device.pnp_state = PNP_STATE['CONFIG_SAVE_STARTUP']
             elif job_type == 'urn:cisco:pnp:cli-exec':
-                if device.pnp_state == PNP_STATE['CONFIG_SAVE_STARTUP']:
-                    # "write memory" exec sucessfully
+                if device.pnp_state == PNP_STATE['CONFIG_REG']:
+                    device.pnp_state = PNP_STATE['CHECK_IMAGE_VER']
+                elif device.pnp_state == PNP_STATE['CONFIG_SAVE_STARTUP']:
                     device.is_configured = True
                     device.pnp_state = PNP_STATE['RUN_EVENT_MANAGER']
                 elif device.pnp_state == PNP_STATE['RUN_EVENT_MANAGER']:
-                    device.pnp_state = PNP_STATE['CHECK_GUESTSHELL']       
+                    device.pnp_state = PNP_STATE['WAIT_FOR_GUESTSHELL']
+                elif device.pnp_state == PNP_STATE['CHECK_GUESTSHELL']:
+                    if ('execLog' in data['pnp']['response'] and
+                        'dialogueLog' in data['pnp']['response']['execLog'] and
+                        'received' in data['pnp']['response']['execLog']['dialogueLog'] and
+                        'text' in data['pnp']['response']['execLog']['dialogueLog']['received'] and
+                        'RUNNING' in data['pnp']['response']['execLog']['dialogueLog']['received']['text']):
+                        device.pnp_state = PNP_STATE['RUN_PY_SCRIPT']
+                    else:
+                        device.pnp_state = PNP_STATE['WAIT_FOR_GUESTSHELL']
                 elif device.pnp_state == PNP_STATE['RUN_PY_SCRIPT']:
                     device.pnp_state = PNP_STATE['FINISHED']
             elif job_type == 'urn:cisco:pnp:backoff':
-                if device.pnp_state == PNP_STATE['CHECK_GUESTSHELL']:
-                    device.pnp_state == PNP_STATE['RUN_PY_SCRIPT']
+                if device.pnp_state == PNP_STATE['WAIT_FOR_GUESTSHELL']:
+                    device.pnp_state = PNP_STATE['CHECK_GUESTSHELL']
                 else:
                     pass
         else:
