@@ -326,6 +326,18 @@ def pnp_work_request():
         elif device.pnp_state == PNP_STATE['CONFIG_SAVE_STARTUP']:
             log_info(f'{udi} - Save running-config as startup-config')
             _response = pnp_cli_exec(udi, correlator, 'write memory')
+        elif device.pnp_state == PNP_STATE['RUN_EVENT_MANAGER']:
+            log_info(f'{udi} - Activate guestshell environment via EEM')
+            _response = pnp_cli_exec(udi, correlator, f'event manager run {pnp_env.EEM_event_name}')
+        elif device.pnp_state == PNP_STATE['CHECK_GUESTSHELL']:
+            log_info(f'{udi} - Wait 1 min for guestshell to be enabled')
+            _response = pnp_backoff(udi, correlator, 1)
+        elif device.pnp_state == PNP_STATE['RUN_PY_SCRIPT']:
+            log_info(f'{udi} - Start guestshell python script')
+            _response = pnp_cli_exec(udi, correlator, f'guestshell run {pnp_env.python_script_filename}')
+        elif device.pnp_state == PNP_STATE['FINISHED']:
+            log_info(f'{udi} - All done')
+            _response = pnp_backoff(udi, correlator, 20)
     else:
         src_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
         create_new_device(udi, src_addr)
@@ -371,19 +383,24 @@ def pnp_work_response():
                     device.has_PY_script = True
                     if not device.is_configured:
                         device.pnp_state = PNP_STATE['CONFIG_START']
-                    #else:
-                        #exec 'event manager run <function>'
+                    else:
+                        device.pnp_state = PNP_STATE['RUN_EVENT_MANAGER']
             elif job_type == 'urn:cisco:pnp:config-upgrade':
                 device.pnp_state = PNP_STATE['CONFIG_SAVE_STARTUP']
             elif job_type == 'urn:cisco:pnp:cli-exec':
-                if not device.is_configured:
+                if device.pnp_state == PNP_STATE['CONFIG_SAVE_STARTUP']:
+                    # "write memory" exec sucessfully
                     device.is_configured = True
-                    #exec 'event manager run <function>'
-                #else:
-                    # event manager run <function> is successful
-                device.pnp_state = PNP_STATE['CONFIG_SAVE_STARTUP']
+                    device.pnp_state = PNP_STATE['RUN_EVENT_MANAGER']
+                elif device.pnp_state == PNP_STATE['RUN_EVENT_MANAGER']:
+                    device.pnp_state = PNP_STATE['CHECK_GUESTSHELL']       
+                elif device.pnp_state == PNP_STATE['RUN_PY_SCRIPT']:
+                    device.pnp_state = PNP_STATE['FINISHED']
             elif job_type == 'urn:cisco:pnp:backoff':
-                pass
+                if device.pnp_state == PNP_STATE['CHECK_GUESTSHELL']:
+                    device.pnp_state == PNP_STATE['RUN_PY_SCRIPT']
+                else:
+                    pass
         else:
             if job_type == 'urn:cisco:pnp:image-install':
                 # If failed to the install the image,

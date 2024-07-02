@@ -18,6 +18,9 @@ image_filename = ''
 config_url = 'http://' + pnp_server_ip + '/configs'
 default_cfg_exists = True
 default_cfg_filename = 'default.cfg'
+#   Name of the event manager applet that will be run
+#   Change this if not correct
+EEM_event_name = 'InstallGuestShell'
 
 #4. Put the file which you want to transfer under ./files folder
 #   Write its filename. For example file_name = 'guestshell.17.09.01a.tar'
