@@ -89,7 +89,7 @@ def pnp_cli_exec(udi: str, correlator: str, command: str) -> str:
     return _template
 
 
-def pnp_transfer_file(udi: str, file_name: str, correlator: str) -> str:
+def pnp_transfer_file(udi: str, file_name: str, correlator: str, destination='bootflash:') -> str:
     response = head(f'{pnp_env.file_url}/{file_name}')
     if response.status_code == 200:
         jinja_context = {
@@ -97,7 +97,7 @@ def pnp_transfer_file(udi: str, file_name: str, correlator: str) -> str:
             'correlator': correlator,
             'base_url': pnp_env.file_url,
             'file_name': file_name,
-            'destination': 'bootflash'
+            'destination': destination
         }
         _template = render_template('file_transfer.xml', **jinja_context)
         log_info(_template)
@@ -322,15 +322,15 @@ def pnp_work_request():
                 device.pnp_state = PNP_STATE['GS_TARBALL_TRANSFER']
                 _response = pnp_transfer_file(udi, pnp_env.guestshell_tarball_filename, correlator)
             elif not device.has_PY_script:
-                log_info(f'{udi} - Now start transferring python script into device bootflash')
-                _response = pnp_transfer_file(udi, pnp_env.python_script_filename, correlator)
+                log_info(f'{udi} - Now start transferring python script into device bootflash:guest-share/')
+                _response = pnp_transfer_file(udi, pnp_env.python_script_filename, correlator, 'bootflash:guest-share/')
             else:
                 device.pnp_state = PNP_STATE['CONFIG_START']
                 log_info(f'{udi} - Update the running configuration')
                 _response = pnp_config_upgrade(udi, correlator)
         elif device.pnp_state == PNP_STATE['PY_SCRIPT_TRANSFER']:
-            log_info(f'{udi} - Now start transferring python script into device bootflash')
-            _response = pnp_transfer_file(udi, pnp_env.python_script_filename, correlator)
+            log_info(f'{udi} - Now start transferring python script into device bootflash:guest-share/')
+            _response = pnp_transfer_file(udi, pnp_env.python_script_filename, correlator, 'bootflash:guest-share/')
         elif device.pnp_state == PNP_STATE['CONFIG_START']:
             log_info(f'{udi} - Update the running configuration')
             _response = pnp_config_upgrade(udi, correlator)
@@ -348,7 +348,7 @@ def pnp_work_request():
             _response = pnp_cli_exec(udi, correlator, 'show app-hosting list')
         elif device.pnp_state == PNP_STATE['RUN_PY_SCRIPT']:
             log_info(f'{udi} - Start guestshell python script')
-            _response = pnp_cli_exec(udi, correlator, f'guestshell run {pnp_env.python_script_filename}')
+            _response = pnp_cli_exec(udi, correlator, f'guestshell run python3 bootflash:guest-share/{pnp_env.python_script_filename}')
         elif device.pnp_state == PNP_STATE['BOOTFLASH_NO_SPACE']:
             log_info(f'{udi} - Fail to install guestshell due to not enough space in the disk, need 1GB')
             _response = pnp_backoff(udi, correlator, 10)

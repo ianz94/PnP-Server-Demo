@@ -6,7 +6,7 @@
                     <location>{{ base_url }}/{{ file_name }}</location>
                 </source>
                 <destination>
-                    <location>{{ destination }}:{{ file_name }}</location>
+                    <location>{{ destination }}{{ file_name }}</location>
                 </destination>
             </copy>
         </fileTransfer>
