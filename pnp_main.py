@@ -346,6 +346,12 @@ def pnp_work_request():
         elif device.pnp_state == PNP_STATE['CHECK_GUESTSHELL']:
             log_info(f'{udi} - Check if the guestshell env is running')
             _response = pnp_cli_exec(udi, correlator, 'show app-hosting list')
+        elif device.pnp_state == PNP_STATE['INSTALL_GUESTSHELL']:
+            log_info(f'{udi} - Install guestshell')
+            _response = pnp_cli_exec(udi, correlator, f'app-hosting install appid guestshell package bootflash:{pnp_env.guestshell_tarball_filename}')
+        elif  device.pnp_state == PNP_STATE['ENABLE_GUESTSHELL']:
+            log_info(f'{udi} - Enable guestshell')
+            _response = pnp_cli_exec(udi, correlator, 'guestshell enable')
         elif device.pnp_state == PNP_STATE['RUN_PY_SCRIPT']:
             log_info(f'{udi} - Start guestshell python script')
             _response = pnp_cli_exec(udi, correlator, f'guestshell run python3 bootflash:guest-share/{pnp_env.python_script_filename}')
@@ -419,11 +425,17 @@ def pnp_work_response():
                     if ('execLog' in data['pnp']['response'] and
                         'dialogueLog' in data['pnp']['response']['execLog'] and
                         'received' in data['pnp']['response']['execLog']['dialogueLog'] and
-                        'text' in data['pnp']['response']['execLog']['dialogueLog']['received'] and
-                        'RUNNING' in data['pnp']['response']['execLog']['dialogueLog']['received']['text']):
-                        device.pnp_state = PNP_STATE['RUN_PY_SCRIPT']
-                    else:
-                        device.pnp_state = PNP_STATE['WAIT_FOR_GUESTSHELL']
+                        'text' in data['pnp']['response']['execLog']['dialogueLog']['received']):
+                        if 'RUNNING' in data['pnp']['response']['execLog']['dialogueLog']['received']['text']:
+                            device.pnp_state = PNP_STATE['RUN_PY_SCRIPT']
+                        elif 'DEPLOYED' in data['pnp']['response']['execLog']['dialogueLog']['received']['text']:
+                            device.pnp_state = PNP_STATE['ENABLE_GUESTSHELL']
+                        elif 'No App found' in data['pnp']['response']['execLog']['dialogueLog']['received']['text']:
+                            device.pnp_state = PNP_STATE['INSTALL_GUESTSHELL']
+                        else:
+                            device.pnp_state = PNP_STATE['WAIT_FOR_GUESTSHELL']
+                elif device.pnp_state in (PNP_STATE['ENABLE_GUESTSHELL'], PNP_STATE['INSTALL_GUESTSHELL']):
+                    device.pnp_state = PNP_STATE['CHECK_GUESTSHELL']
                 elif device.pnp_state == PNP_STATE['RUN_PY_SCRIPT']:
                     device.pnp_state = PNP_STATE['FINISHED']
             elif job_type == 'urn:cisco:pnp:backoff':
