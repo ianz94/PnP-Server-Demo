@@ -167,6 +167,14 @@ def check_update(udi: str):
     else:
         device.pnp_state = PNP_STATE['UPGRADE_NEEDED']
 
+def check_bootflash_freespace(response: dict) -> bool:
+    if ('fileSystemList' in response and
+        'fileSystem' in response['fileSystemList'] and
+        '@freespace' in response['fileSystemList']['fileSystem'] and
+        int(response['fileSystemList']['fileSystem']['@freespace'] < 1026107392)):
+        return False
+    else:
+        return True
 
 def read_device_status(filename: str):
     with open(filename, 'r') as csvfile:
@@ -297,7 +305,7 @@ def pnp_work_request():
         elif device.pnp_state == PNP_STATE['CONFIG_REG']:
             log_info(f'{udi} - Save config register & pnp config')
             _response = pnp_cli_exec(udi, correlator, 'write memory')
-        elif device.pnp_state in [PNP_STATE['CHECK_IMAGE_VER'], PNP_STATE['UPGRADE_RELOADING']]:
+        elif device.pnp_state in [PNP_STATE['CHECK_IMAGE_VER'], PNP_STATE['UPGRADE_RELOADING'], PNP_STATE['CHECK_BOOTFLASH_SIZE']]:
             log_info(f'{udi} - Check its device info')
             _response = pnp_device_info(udi, correlator, 'all')
         elif device.pnp_state == PNP_STATE['UPGRADE_NEEDED']:
@@ -341,6 +349,9 @@ def pnp_work_request():
         elif device.pnp_state == PNP_STATE['RUN_PY_SCRIPT']:
             log_info(f'{udi} - Start guestshell python script')
             _response = pnp_cli_exec(udi, correlator, f'guestshell run {pnp_env.python_script_filename}')
+        elif device.pnp_state == PNP_STATE['BOOTFLASH_NO_SPACE']:
+            log_info(f'{udi} - Fail to install guestshell due to not enough space in the disk, need 1GB')
+            _response = pnp_backoff(udi, correlator, 10)
         elif device.pnp_state == PNP_STATE['FINISHED']:
             log_info(f'{udi} - All done')
             _response = pnp_backoff(udi, correlator, 20)
@@ -374,11 +385,14 @@ def pnp_work_response():
             if job_type == 'urn:cisco:pnp:cli-config':
                 device.pnp_state = PNP_STATE['CONFIG_REG']
             elif job_type == 'urn:cisco:pnp:device-info':
-                if device.pnp_state in [PNP_STATE['CHECK_IMAGE_VER'], PNP_STATE['UPGRADE_RELOAD_NEEDED'], PNP_STATE['UPGRADE_RELOADING']]:
-                    update_device_info(data)
+                update_device_info(data)
+                if device.pnp_state in [PNP_STATE['CHECK_IMAGE_VER'], PNP_STATE['UPGRADE_RELOAD_NEEDED'], PNP_STATE['UPGRADE_RELOADING']]:                    
                     check_update(udi)
-                else:
-                    update_device_info(data)
+                elif device.pnp_state == PNP_STATE['CHECK_BOOTFLASH_SIZE']:
+                    if check_bootflash_freespace(data['pnp']['response']) == True:
+                        device.pnp_state = PNP_STATE['RUN_EVENT_MANAGER']
+                    else:
+                        device.pnp_state = PNP_STATE['BOOTFLASH_NO_SPACE']
             elif job_type == 'urn:cisco:pnp:image-install':
                 device.pnp_state = PNP_STATE['UPGRADE_RELOAD_NEEDED']
             elif job_type == 'urn:cisco:pnp:file-transfer':
@@ -398,7 +412,7 @@ def pnp_work_response():
                     device.pnp_state = PNP_STATE['CHECK_IMAGE_VER']
                 elif device.pnp_state == PNP_STATE['CONFIG_SAVE_STARTUP']:
                     device.is_configured = True
-                    device.pnp_state = PNP_STATE['RUN_EVENT_MANAGER']
+                    device.pnp_state = PNP_STATE['CHECK_BOOTFLASH_SIZE']
                 elif device.pnp_state == PNP_STATE['RUN_EVENT_MANAGER']:
                     device.pnp_state = PNP_STATE['WAIT_FOR_GUESTSHELL']
                 elif device.pnp_state == PNP_STATE['CHECK_GUESTSHELL']:
