@@ -106,6 +106,6 @@ $ cat DEVICE_STATUS.csv
 ```
 The ISR1k image file is 700+MB, the entire workflow should take some time.
 
-If you see "FINISHED" in the last column, then this device have finished all 12 steps in the PnP workflow mentioned above.
+If you see "FINISHED" in the last column, then this device have finished all 13 steps in the PnP workflow mentioned above.
 
 Detailed log file can be found at *logs/pnp_debug.log*.
