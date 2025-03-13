@@ -57,7 +57,7 @@ class Device:
         self.has_PY_script: bool = False
 
 def configure_logger(path: str, log_to_console: bool):
-    # # Disable FLASK console output
+    # Disable FLASK console output
     logging.getLogger("werkzeug").disabled = True
     
     # Define our own logger
@@ -88,6 +88,13 @@ def configure_logger(path: str, log_to_console: bool):
 def log_info(message: str):
     log = logging.getLogger('pnp_server')
     log.info(message)
+
+
+def log_error(message: str):
+    log = logging.getLogger('pnp_server')
+    log.error(message)
+    # Also print error message to console to raise attention
+    print(f'ERROR: {message}')
 
 
 def calculate_md5(filepath):
