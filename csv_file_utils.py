@@ -1,8 +1,7 @@
 import csv
-from pnp_main import devices, images
 from pnp_utils import PNP_STATE_LIST, PNP_STATE, Device
 
-def read_device_status_from_csv_file(filename: str):
+def read_device_status_from_csv_file(filename: str, devices: dict, images: dict):
     with open(filename, 'r') as csvfile:
         csv_reader = csv.reader(csvfile, delimiter='|')
         # skip the top row of fieldnames
@@ -43,7 +42,7 @@ def read_device_status_from_csv_file(filename: str):
             devices[udi] = device
 
 
-def update_device_status_to_csv_file(filename: str):
+def update_device_status_to_csv_file(filename: str, devices: dict):
     # Fixed width for each column
     column_widths = [15, 16, 9, 16, 24, 24, 22, 40, 20, 15, 15, 20]
 

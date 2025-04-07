@@ -386,9 +386,9 @@ if __name__ == '__main__':
     configure_logger(pnp_env.log_file, pnp_env.log_to_console)
     log_info('Start Logging:')
 
-    read_device_status_from_csv_file(pnp_env.device_status_filename)
+    read_device_status_from_csv_file(pnp_env.device_status_filename, devices, images)
     scheduler = BackgroundScheduler()
-    scheduler.add_job(update_device_status_to_csv_file, 'interval', minutes=0.5, args=[pnp_env.device_status_filename])
+    scheduler.add_job(update_device_status_to_csv_file, 'interval', minutes=0.5, args=[pnp_env.device_status_filename, devices])
     scheduler.start()
 
     print()
