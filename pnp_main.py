@@ -22,7 +22,7 @@ def pnp_device_info(udi: str, correlator: str, info_type: str) -> str:
 
 def pnp_install_image(udi: str, correlator: str) -> str:
     device = devices[udi]
-    response = head(f'{pnp_env.image_url}/{device.target_image.image}')
+    response = head(f'http://localhost/images/{device.target_image.image}')
     if response.status_code == 200:
         device.pnp_state = PNP_STATE['UPGRADE_INPROGRESS']
         jinja_context = {
@@ -44,11 +44,11 @@ def pnp_install_image(udi: str, correlator: str) -> str:
 def pnp_config_upgrade(udi: str, correlator: str) -> str:
     device = devices[udi]
     cfg_file = f'{device.serial_number}.cfg'
-    response = head(f'{pnp_env.config_url}/{cfg_file}')
+    response = head(f'http://localhost/configs/{cfg_file}')
     if response.status_code != 200:  # SERIAL.cfg not found
         if pnp_env.default_cfg_exists:
             cfg_file = pnp_env.default_cfg_filename
-            response = head(f'{pnp_env.config_url}/{cfg_file}')
+            response = head(f'http://localhost/configs/{cfg_file}')
             if response.status_code != 200:  # default.cfg also not found
                 log_info(f'Config file {pnp_env.config_url}/{cfg_file} does not exist')
                 return ''
@@ -90,7 +90,7 @@ def pnp_cli_exec(udi: str, correlator: str, command: str) -> str:
 
 
 def pnp_transfer_file(udi: str, file_name: str, correlator: str, destination='bootflash:') -> str:
-    response = head(f'{pnp_env.file_url}/{file_name}')
+    response = head(f'http://localhost/files/{file_name}')
     if response.status_code == 200:
         jinja_context = {
             'udi': udi,
