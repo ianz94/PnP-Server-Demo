@@ -99,7 +99,7 @@ Config file(s) base URL : http://10.2.3.4/configs
 Then boot up all the ISR1k devices. Please make sure they are either new devices or  have been factory-reset. They will not enter the PnP workflow if startup-config exists.
 
 When the PnP server is running, you can cat the *DEVICE_STATUS.csv* to know about the current status. It should look like this:
-```
+```bash
 $ cat DEVICE_STATUS.csv
  Serial Number |    Platform    | HW rev. |   IP Address   |       First Seen       |      Last Contact      |   Current Version    |              Target Image              | Guestshell Tarball | Python Script | Config Update |    Device State    
   FGL2548L0AW  |   C1131-8PWB   |   V01   | 10.75.221.155  |  2024-07-03T15:42:31   |  2024-07-03T16:25:55   |       17.12.3a       |  c1100-universalk9.17.12.03a.SPA.bin   |        Done        |     Done      |     Done      |      FINISHED  
@@ -109,3 +109,114 @@ The ISR1k image file is 700+MB, the entire workflow should take some time.
 If you see "FINISHED" in the last column, then this device have finished all 13 steps in the PnP workflow mentioned above.
 
 Detailed log file can be found at *logs/pnp_debug.log*.
+
+## Database Setup
+This PnP server supports both CSV file-based and MariaDB database-based storage for device state persistence. Using a database offers better reliability and concurrent access. Follow these steps to set up the database:
+
+### Option 1: Install and Setup MariaDB Locally
+
+1. **Install MariaDB on your local server**
+
+     ```bash
+     # Install MariaDB if not already installed
+     # For Ubuntu/Debian
+     sudo apt update
+     sudo apt install mariadb-server
+     
+     # For CentOS/RHEL
+     sudo yum install mariadb-server mariadb
+     
+     # Start MariaDB service
+     sudo systemctl start mariadb
+     # Enable MariaDB to start automatically on boot
+     sudo systemctl enable mariadb
+     # Check if MariaDB is actively running
+     sudo systemctl status mariadb
+     ```
+
+2. **(Optional) Secure your MariaDB installation**
+
+     ```
+     sudo mysql_secure_installation
+     ```
+     (Optional) You will be guided by the prompts to:
+     - Set a root password
+     - Remove anonymous users
+     - Disallow root login remotely
+     - Remove test database
+     - Reload privilege tables
+
+3. **Create a database and user**
+
+     ```bash
+     sudo mysql -u root -p
+     ```
+
+     Then in the MySQL prompt:
+
+     ```sql
+     CREATE DATABASE pnp_db;
+     CREATE USER 'pnp_user'@'localhost' IDENTIFIED BY 'pnp_password';
+     GRANT ALL PRIVILEGES ON pnp_db.* TO 'pnp_user'@'localhost';
+     FLUSH PRIVILEGES;
+     EXIT;
+     ```
+     Remember to replace 'pnp_password' with a stronger one if necessary.
+
+4. **Update Database Configuration**
+     
+     Edit the pnp_env.py file to include your database credentials:
+     ```python
+     # Database Configuration
+     db_config = {
+          'host': '127.0.0.1',
+          'port': 3306,
+          'user': 'pnp_user',
+          'password': 'pnp_password',  # Use the password you created
+          'database': 'pnp_db'
+     }
+     ```
+
+### Option 2: Use a Remote MariaDB Server
+
+1. **Ensure you have the connection details for your remote MariaDB server (hostname, port, username, password).**
+
+2. **Create a database and grant access on remote server**
+
+     ```sql
+     CREATE DATABASE pnp_db;
+     CREATE USER 'pnp_user'@'%' IDENTIFIED BY 'pnp_password';
+     GRANT ALL PRIVILEGES ON pnp_server.* TO 'pnp_user'@'%';
+     FLUSH PRIVILEGES;
+     ```
+     Note: The '%' allows connection from any host. For better security, use your PnP server's specific IP address.
+3. **Make sure the remote server's firewall allows connections on the MariaDB port (default 3306)**
+
+4. **Update Database Configuration**
+     
+     Edit the pnp_env.py file with remote server details:
+     ```python
+     # Database Configuration
+     db_config = {
+          'host': 'remote_server_ip',  # Replace with your remote server IP
+          'port': 3306,
+          'user': 'pnp_user',
+          'password': 'pnp_password',  # Use the password you created
+          'database': 'pnp_db'
+     }
+     ```
+
+### Testing the Database Connection
+
+1. **Run the test script to verify your database connection**
+```bash
+python test_db_connection.py
+```
+Luckily you should be able to see "MariaDB connection is successful!"
+
+2. **Troubleshooting**:
+   - If you get "Error connecting to MariaDB: Can't connect to local MySQL server through socket", ensure MariaDB is running
+   - For "Access denied" errors, verify your username, password, and privileges
+   - For "Host is not allowed" errors, check your user's allowed hosts and firewall settings
+
+Once your database connection is working, the PnP server will automatically create the necessary tables on first run.
