@@ -51,7 +51,6 @@ class Device:
         self.pnp_state: int = PNP_STATE['NONE']
         self.version: str = ''
         self.image: str = ''
-        self.target_image: SoftwareImage = None
         self.is_configured: bool = False
         self.has_GS_tarball: bool = False
         self.has_PY_script: bool = False

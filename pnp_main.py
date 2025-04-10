@@ -4,8 +4,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from requests import head
 import xmltodict
 import pnp_env
-from pnp_utils import PNP_STATE_LIST, PNP_STATE, Device, SoftwareImage, configure_logger, log_info, calculate_md5
+from pnp_utils import PNP_STATE_LIST, PNP_STATE, Device, SoftwareImage, configure_logger, log_info, log_error, calculate_md5
 from csv_file_utils import read_device_status_from_csv_file, update_device_status_to_csv_file
+from db_utils import init_db, read_device_status_from_db, write_device_status_into_db, save_device_status
 
 def pnp_device_info(udi: str, correlator: str, info_type: str) -> str:
     # info_type can be one of:
@@ -22,22 +23,22 @@ def pnp_device_info(udi: str, correlator: str, info_type: str) -> str:
 
 def pnp_install_image(udi: str, correlator: str) -> str:
     device = devices[udi]
-    response = head(f'http://localhost/images/{device.target_image.image}')
+    response = head(f'http://localhost/images/{target_image.image}')
     if response.status_code == 200:
         device.pnp_state = PNP_STATE['UPGRADE_INPROGRESS']
         jinja_context = {
             'udi': udi,
             'correlator': correlator,
             'base_url': pnp_env.image_url,
-            'image_name': device.target_image.image,
-            'md5': device.target_image.md5.lower(),
+            'image_name': target_image.image,
+            'md5': target_image.md5.lower(),
             'destination': 'bootflash'
         }
         _template = render_template('image_install.xml', **jinja_context)
         log_info(_template)
         return _template
     else:
-        log_info(f'Image file {pnp_env.image_url}/{device.target_image.image} does not exist')
+        log_error(f'Image file {pnp_env.image_url}/{target_image.image} does not exist')
         return ''
 
 
@@ -50,10 +51,10 @@ def pnp_config_upgrade(udi: str, correlator: str) -> str:
             cfg_file = pnp_env.default_cfg_filename
             response = head(f'http://localhost/configs/{cfg_file}')
             if response.status_code != 200:  # default.cfg also not found
-                log_info(f'Config file {pnp_env.config_url}/{cfg_file} does not exist')
+                log_error(f'Config file {pnp_env.config_url}/{cfg_file} does not exist')
                 return ''
         else:
-            log_info(f'Config file {pnp_env.config_url}/{cfg_file} does not exist')
+            log_error(f'Config file {pnp_env.config_url}/{cfg_file} does not exist')
             return ''
     device.pnp_state = PNP_STATE['CONFIG_START']
     jinja_context = {
@@ -103,7 +104,7 @@ def pnp_transfer_file(udi: str, file_name: str, correlator: str, destination='bo
         log_info(_template)
         return _template
     else:
-        log_info(f'File {pnp_env.file_url}/{file_name} does not exist')
+        log_error(f'File {pnp_env.file_url}/{file_name} does not exist')
         return ''
 
 
@@ -149,20 +150,29 @@ def create_new_device(udi: str, src_addr: str):
         hw_rev=hw_rev
     )
     devices[udi].pnp_state = PNP_STATE['NEW_DEVICE']
-    devices[udi].target_image = images[pnp_env.image_filename]
 
 
 def update_device_info(data: dict):
-    udi = data['pnp']['@udi']
-    device = devices[udi]
-    device.version = data['pnp']['response']['imageInfo']['versionString'].strip()
-    device.image = data['pnp']['response']['imageInfo']['imageFile'].split(':')[1]
-    device.last_contact = strftime(pnp_env.time_format)
+    try:
+        udi = data['pnp']['@udi']
+        device = devices[udi]
+        
+        if ('imageInfo' in data['pnp']['response'] and 
+            'versionString' in data['pnp']['response']['imageInfo'] and
+            'imageFile' in data['pnp']['response']['imageInfo']):
+            device.version = data['pnp']['response']['imageInfo']['versionString'].strip()
+            device.image = data['pnp']['response']['imageInfo']['imageFile'].split(':')[1]
+            
+        device.last_contact = strftime(pnp_env.time_format)
+        # Save to database immediately
+        save_device_status(device)
+    except (KeyError, AttributeError) as e:
+        log_error(f"Error updating device info: {e}")
 
 
 def check_update(udi: str):
     device = devices[udi]
-    if device.image == device.target_image.image:
+    if device.image == target_image.image:
         device.pnp_state = PNP_STATE['UPGRADE_DONE']
     else:
         device.pnp_state = PNP_STATE['UPGRADE_NEEDED']
@@ -172,9 +182,11 @@ def check_bootflash_freespace(response: dict) -> bool:
     if ('fileSystemList' in response and
         'fileSystem' in response['fileSystemList'] and
         '@freespace' in response['fileSystemList']['fileSystem'] and
-        int(response['fileSystemList']['fileSystem']['@freespace'] < 1026107392)):
+        int(response['fileSystemList']['fileSystem']['@freespace']) < 1026107392):
+        log_error(f'Not enough space in bootflash: {response["fileSystemList"]["fileSystem"]["@freespace"]} bytes, need 1026107392 bytes')
         return False
     else:
+        log_info(f'Sufficient space in bootflash to install Guestshell')
         return True
 
 
@@ -239,6 +251,7 @@ def pnp_work_request():
                 _response = pnp_transfer_file(udi, pnp_env.guestshell_tarball_filename, correlator)
             elif not device.has_PY_script:
                 log_info(f'{udi} - Now start transferring python script into device bootflash:guest-share/')
+                device.pnp_state = PNP_STATE['PY_SCRIPT_TRANSFER']
                 _response = pnp_transfer_file(udi, pnp_env.python_script_filename, correlator, 'bootflash:guest-share/')
             else:
                 device.pnp_state = PNP_STATE['CONFIG_START']
@@ -272,7 +285,7 @@ def pnp_work_request():
             log_info(f'{udi} - Start guestshell python script')
             _response = pnp_cli_exec(udi, correlator, f'guestshell run python3 bootflash:guest-share/{pnp_env.python_script_filename}')
         elif device.pnp_state == PNP_STATE['BOOTFLASH_NO_SPACE']:
-            log_info(f'{udi} - Fail to install guestshell due to not enough space in the disk, need 1GB')
+            log_error(f'{udi} - Fail to install guestshell due to not enough space in the disk, need 1GB')
             _response = pnp_backoff(udi, correlator, 10)
         elif device.pnp_state == PNP_STATE['FINISHED']:
             log_info(f'{udi} - All done')
@@ -289,16 +302,23 @@ def pnp_work_response():
     src_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
     data = xmltodict.parse(request.data)
     log_info(f'Received pnp response msg:\n{xmltodict.unparse(data, full_document=False, pretty=True)}')
-    correlator = data['pnp']['response']['@correlator']
-    udi = data['pnp']['@udi']
-    log_info(f'Responding to device {udi} -')
-    job_type = data['pnp']['response']['@xmlns']
+    
+    # Parse PnP response
+    try:
+        correlator = data['pnp']['response']['@correlator']
+        udi = data['pnp']['@udi']
+        job_type = data['pnp']['response']['@xmlns']
+    except (KeyError, TypeError) as e:
+        log_error(f"Error parsing PnP response: {e}")
+        return Response('')
+    
     if udi not in devices.keys():
         create_new_device(udi, src_addr)
     device = devices[udi]
     device.ip_address = src_addr
     device.last_contact = strftime(pnp_env.time_format)
     if job_type == 'urn:cisco:pnp:fault':
+        log_error(f'{udi} - Received fault response')
         return Response('')
     else:
         correlator = data['pnp']['response']['@correlator']
@@ -386,9 +406,22 @@ if __name__ == '__main__':
     configure_logger(pnp_env.log_file, pnp_env.log_to_console)
     log_info('Start Logging:')
 
-    read_device_status_from_csv_file(pnp_env.device_status_filename, devices, images)
     scheduler = BackgroundScheduler()
-    scheduler.add_job(update_device_status_to_csv_file, 'interval', minutes=0.5, args=[pnp_env.device_status_filename, devices])
+
+    # if  usedb:
+    
+    # Initialize database before using it
+    if not init_db():
+        print("Failed to initialize database")
+        exit(1)
+
+    read_device_status_from_db(devices)
+    scheduler.add_job(write_device_status_into_db, 'interval', minutes=0.5, args=[devices])
+    
+    # else:
+    #     read_device_status_from_csv_file(pnp_env.device_status_filename, devices, images)
+    #     scheduler.add_job(update_device_status_to_csv_file, 'interval', minutes=0.5, args=[pnp_env.device_status_filename, devices])
+    
     scheduler.start()
 
     print()

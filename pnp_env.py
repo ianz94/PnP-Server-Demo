@@ -39,3 +39,12 @@ log_file = 'logs/pnp_debug.log'
 # You can turn this on if you want to see the log in console at runtime
 log_to_console = False
 time_format = '%Y-%m-%dT%H:%M:%S'
+
+# Database Configuration
+db_config = {
+    'host': 'localhost',
+    'port': 3306,
+    'user': 'pnp_user',
+    'password': 'pnp_password',
+    'database': 'pnp_db'
+}
