@@ -42,7 +42,7 @@ time_format = '%Y-%m-%dT%H:%M:%S'
 
 # Database Configuration
 db_config = {
-    'host': 'localhost',
+    'host': '127.0.0.1',
     'port': 3306,
     'user': 'pnp_user',
     'password': 'pnp_password',
