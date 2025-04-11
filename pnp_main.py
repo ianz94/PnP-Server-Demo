@@ -6,7 +6,7 @@ import xmltodict
 import pnp_env
 from pnp_utils import PNP_STATE_LIST, PNP_STATE, Device, SoftwareImage, configure_logger, log_info, log_error, calculate_md5
 from csv_file_utils import read_device_status_from_csv_file, update_device_status_to_csv_file
-from db_utils import init_db, read_device_status_from_db, write_device_status_into_db, save_device_status
+from db_utils import init_db, get_db_connection, read_device_status_from_db, write_device_status_into_db, save_device_status
 
 def pnp_device_info(udi: str, correlator: str, info_type: str) -> str:
     # info_type can be one of:
@@ -387,6 +387,29 @@ def pnp_work_response():
                 device.pnp_state = PNP_STATE['UPGRADE_RELOADING']
         _response = pnp_bye(udi, correlator)
         return Response(_response, mimetype='text/xml')
+
+
+@app.route('/dashboard')
+def dashboard():
+    conn = get_db_connection()
+    if not conn:
+        return "Database connection error", 500
+    
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM devices")
+        rows = cursor.fetchall()
+        
+        # Convert device_state to text
+        for row in rows:
+            row['state_name'] = PNP_STATE_LIST[row['device_state']]
+        
+        return render_template('dashboard.html', devices=rows)
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+    finally:
+        cursor.close()
+        conn.close()
 
 
 if __name__ == '__main__':

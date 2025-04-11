@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PnP Server Dashboard</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        tr:hover {background-color: #f5f5f5;}
+        .refresh {
+            margin: 20px 0;
+        }
+    </style>
+    <meta http-equiv="refresh" content="5"> <!-- Auto refresh every 5 seconds -->
+</head>
+<body>
+    <h1>PnP Server Device Status</h1>
+    <p>Last updated: <span id="datetime"></span></p>
+    
+    <table>
+        <tr>
+            <th>Serial Number</th>
+            <th>Platform</th>
+            <th>HW rev.</th>
+            <th>IP Address</th>
+            <th>Current Version</th>
+            <th>Guestshell</th>
+            <th>Python Script</th>
+            <th>Config</th>
+            <th>Device State</th>
+        </tr>
+        {% for device in devices %}
+        <tr>
+            <td>{{ device.serial_number }}</td>
+            <td>{{ device.platform }}</td>
+            <td>{{ device.hw_rev }}</td>
+            <td>{{ device.ip_address }}</td>
+            <td>{{ device.current_version }}</td>
+            <td>{{ "Done" if device.has_gs_tarball else "Pending" }}</td>
+            <td>{{ "Done" if device.has_py_script else "Pending" }}</td>
+            <td>{{ "Done" if device.is_configured else "Pending" }}</td>
+            <td>{{ device.state_name }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    
+    <script>
+        function updateDateTime() {
+            document.getElementById("datetime").innerHTML = new Date().toLocaleString();
+        }
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+    </script>
+</body>
+</html>
