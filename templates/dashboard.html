@@ -1,55 +1,146 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PnP Server Dashboard</title>
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        header {
+            background-color: #00BBEA;
+            color: white;
+            padding: 20px 10px;
+            text-align: center;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow-x: auto; /* Enable horizontal scrolling */
+        }
+        .last-updated {
+            text-align: right;
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 10px;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 10px;
+            table-layout: fixed; /* Ensures the table fits within the container */
+            word-wrap: break-word; /* Prevents content from overflowing */
         }
         th, td {
-            padding: 8px;
+            padding: 12px 15px;
             text-align: left;
             border-bottom: 1px solid #ddd;
         }
-        tr:hover {background-color: #f5f5f5;}
-        .refresh {
-            margin: 20px 0;
+        th {
+            background-color: #0D274D;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #e0f7fa;
+            cursor: pointer;
+        }
+        .status-done {
+            color: green;
+            font-weight: bold;
+        }
+        .status-pending {
+            color: red;
+            font-weight: bold;
+        }
+        footer {
+            text-align: center;
+            padding: 10px 0;
+            margin-top: 20px;
+            background-color: #00BBEA;
+            color: white;
+            font-size: 14px;
+        }
+        @media (max-width: 768px) {
+            th, td {
+                font-size: 14px;
+                padding: 8px;
+            }
         }
     </style>
     <meta http-equiv="refresh" content="5"> <!-- Auto refresh every 5 seconds -->
 </head>
 <body>
-    <h1>PnP Server Device Status</h1>
-    <p>Last updated: <span id="datetime"></span></p>
-    
-    <table>
-        <tr>
-            <th>Serial Number</th>
-            <th>Platform</th>
-            <th>HW rev.</th>
-            <th>IP Address</th>
-            <th>Current Version</th>
-            <th>Guestshell</th>
-            <th>Python Script</th>
-            <th>Config</th>
-            <th>Device State</th>
-        </tr>
-        {% for device in devices %}
-        <tr>
-            <td>{{ device.serial_number }}</td>
-            <td>{{ device.platform }}</td>
-            <td>{{ device.hw_rev }}</td>
-            <td>{{ device.ip_address }}</td>
-            <td>{{ device.current_version }}</td>
-            <td>{{ "Done" if device.has_gs_tarball else "Pending" }}</td>
-            <td>{{ "Done" if device.has_py_script else "Pending" }}</td>
-            <td>{{ "Done" if device.is_configured else "Pending" }}</td>
-            <td>{{ device.state_name }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-    
+    <header role="banner">
+        <h1>PnP Server Device Status Dashboard</h1>
+    </header>
+    <div class="container">
+        <div class="last-updated">
+            Last updated: <span id="datetime"></span>
+        </div>
+        <table role="table">
+            <thead>
+                <tr>
+                    <th>Serial Number</th>
+                    <th>Platform</th>
+                    <th>IP Address</th>
+                    <th>Current Version</th>
+                    <th>Guestshell Installation</th>
+                    <th>Python Script Transfer</th>
+                    <th>Config Update</th>
+                    <th>First Seen</th>
+                    <th>Last Contact</th>
+                    <th>Device State</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if devices %}
+                    {% for device in devices %}
+                    <tr>
+                        <td>{{ device.serial_number }}</td>
+                        <td>{{ device.platform }}</td>
+                        <td>{{ device.ip_address }}</td>
+                        <td>{{ device.current_version }}</td>
+                        <td class="{{ 'status-done' if device.has_gs_tarball else 'status-pending' }}">
+                            {{ "Done" if device.has_gs_tarball else "Pending" }}
+                        </td>
+                        <td class="{{ 'status-done' if device.has_py_script else 'status-pending' }}">
+                            {{ "Done" if device.has_py_script else "Pending" }}
+                        </td>
+                        <td class="{{ 'status-done' if device.is_configured else 'status-pending' }}">
+                            {{ "Done" if device.is_configured else "Pending" }}
+                        </td>
+                        <td>{{ device.first_seen }}</td>
+                        <td>{{ device.last_contact }}</td>
+                        <td>{{ device.state_name }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="10" style="text-align: center; padding: 20px;">No devices found</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    <footer>
+        Layout of this dashboard can be modified in ./templates/dashboard.html
+    </footer>
     <script>
         function updateDateTime() {
             document.getElementById("datetime").innerHTML = new Date().toLocaleString();
