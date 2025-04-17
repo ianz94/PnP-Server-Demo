@@ -98,12 +98,8 @@ Config file(s) base URL : http://10.2.3.4/configs
 ```
 Then boot up all the ISR1k devices. Please make sure they are either new devices or  have been factory-reset. They will not enter the PnP workflow if startup-config exists.
 
-When the PnP server is running, you can cat the *DEVICE_STATUS.csv* to know about the current status. It should look like this:
-```bash
-$ cat DEVICE_STATUS.csv
- Serial Number |    Platform    | HW rev. |   IP Address   |       First Seen       |      Last Contact      |   Current Version    |              Target Image              | Guestshell Tarball | Python Script | Config Update |    Device State    
-  FGL2548L0AW  |   C1131-8PWB   |   V01   | 10.75.221.155  |  2024-07-03T15:42:31   |  2024-07-03T16:25:55   |       17.12.3a       |  c1100-universalk9.17.12.03a.SPA.bin   |        Done        |     Done      |     Done      |      FINISHED  
-```
+When the PnP server is running, you can view device status through the web dashboard at http://your-server-ip/dashboard
+
 The ISR1k image file is 700+MB, the entire workflow should take some time.
 
 If you see "FINISHED" in the last column, then this device have finished all 13 steps in the PnP workflow mentioned above.
@@ -111,7 +107,7 @@ If you see "FINISHED" in the last column, then this device have finished all 13 
 Detailed log file can be found at *logs/pnp_debug.log*.
 
 ## Database Setup
-This PnP server supports both CSV file-based and MariaDB database-based storage for device state persistence. Using a database offers better reliability and concurrent access. Follow these steps to set up the database:
+This PnP server supports MariaDB database-based storage for device state persistence. Using a database offers better reliability and concurrent access. Follow these steps to set up the database:
 
 ### Option 1: Install and Setup MariaDB Locally
 

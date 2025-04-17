@@ -73,9 +73,6 @@ python_script_filename = ''
 # 0x2102 - normal boot from flash with config loading
 isr1k_config_register = '0x2102'
 
-# CSV file for tracking device status (legacy method)
-device_status_filename = 'DEVICE_STATUS.csv'
-
 ########################
 # LOGGING CONFIGURATION
 ########################
