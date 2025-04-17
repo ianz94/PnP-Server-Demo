@@ -18,7 +18,7 @@ With PnP server and DHCP server being set up properly, we can achieve such workf
  4. PnP server sends CLI to set the config-register value of device (for ISR1k should be 0x2102)
  5. PnP server sends CLI “_write memory_” to ISR1k, so its config-register and PnP connection info are saved
  6. PnP server checks the image version which the ISR1k is currently running at
- 7. If image version does not match with the one defined in pnp_env.py, PnP server sends the new IOS image to ISR1k, ISR1k copies it into bootflash
+ 7. If image version does not match with the one defined in settings.py, PnP server sends the new IOS image to ISR1k, ISR1k copies it into bootflash
  8. ISR1k automatically reloads itself. And then boots up with the new image.
  9. PnP server transfers the Guestshell tarball & Python script to the device bootflash.
  10. PnP server sends the day-0 config to the device. The day-0 config contains a event manager applet "InstallGuestShell", which can be triggered later to install and enable Guestshell. Please refer to configs/default.cfg for this event manager. It can be modified at your will.
@@ -72,7 +72,7 @@ Install all of the modules that this repo depends on:
 pip3 install -r requirements.txt
 ```
 
-Edit *pnp_env.py* to set up the environment variables (server IP address, config file name, guestshell tarball file name, python script name).
+Edit *settings.py* to set up the environment variables (server IP address, config file name, guestshell tarball file name, python script name).
 
 Then please
  1. Put the image file you want the devices to upgrade with to the ./images folder, 
@@ -80,9 +80,9 @@ Then please
  3. Put the file which you want to transfer under ./files folder, for example *guestshell.17.09.01a.tar* and *pxs.py*.
 
 ### Step 4
-Now you should be ready to go. Run the main script:
+Now you should be ready to go. Run the entry point script:
 
-     $ python3 ./pnp_main.py
+     $ sudo python3 ./run.py
 
 You should be able to see this output in your console. Please double check if the IP address and directories are correct. Otherwise the devices are not able to get what they want.
 ```
@@ -93,7 +93,7 @@ Listen on port          : 80
 Image file(s) base URL  : http://10.2.3.4/images
 Config file(s) base URL : http://10.2.3.4/configs
 
- * Serving Flask app 'pnp_main'
+ * Serving Flask app 'run'
  * Debug mode: off
 ```
 Then boot up all the ISR1k devices. Please make sure they are either new devices or  have been factory-reset. They will not enter the PnP workflow if startup-config exists.
@@ -165,7 +165,7 @@ This PnP server supports both CSV file-based and MariaDB database-based storage 
 
 4. **Update Database Configuration**
      
-     Edit the pnp_env.py file to include your database credentials:
+     Edit the settings.py file to include your database credentials:
      ```python
      # Database Configuration
      db_config = {
@@ -194,7 +194,7 @@ This PnP server supports both CSV file-based and MariaDB database-based storage 
 
 4. **Update Database Configuration**
      
-     Edit the pnp_env.py file with remote server details:
+     Edit the settings.py file with remote server details:
      ```python
      # Database Configuration
      db_config = {
@@ -210,7 +210,7 @@ This PnP server supports both CSV file-based and MariaDB database-based storage 
 
 1. **Run the test script to verify your database connection**
 ```bash
-python test_db_connection.py
+python3 ./app/database/test_db_connection.py
 ```
 Luckily you should be able to see "MariaDB connection is successful!"
 
@@ -220,3 +220,11 @@ Luckily you should be able to see "MariaDB connection is successful!"
    - For "Host is not allowed" errors, check your user's allowed hosts and firewall settings
 
 Once your database connection is working, the PnP server will automatically create the necessary tables on first run.
+
+## Web Dashboard
+
+The PnP Server includes a web dashboard that displays the status of all devices in real-time. You can access it by visiting `http://your-server-ip/dashboard` (or `http://localhost/dashboard` for local usage) in your browser.
+
+![Dashboard Example](templates/Dashboard_Example.png)
+
+The dashboard automatically refreshes every 5 seconds to show the most current device status.
