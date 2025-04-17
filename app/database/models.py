@@ -1,7 +1,7 @@
 import mariadb
-from pnp_env import db_config
-from pnp_utils import Device, SoftwareImage, PNP_STATE, PNP_STATE_LIST, log_info, log_error
-from time import strftime
+from settings import db_config
+from app.utils.device import Device
+from app.utils.logger import log_error
 
 def get_db_connection():
     """Create a connection to the MariaDB database"""
