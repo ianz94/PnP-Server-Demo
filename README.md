@@ -65,11 +65,11 @@ $ sudo systemctl status isc-dhcp-server
 ```
 
 ### Step 3
-Git clone this repo into the PnP server.
+Git clone this repo into the PnP server. It's recommended to set up a Python virtual environment to avoid module version conflicts and ensure consistent deployment.
 
-Install all of the modules that this repo depends on:
+Run the setup script to verify your Python version (>= 3.8), create the virtual enviroment and install all dependencies:
 ```
-pip3 install -r requirements.txt
+./setup.sh
 ```
 
 Edit *settings.py* to set up the environment variables (server IP address, config file name, guestshell tarball file name, python script name).
@@ -80,10 +80,14 @@ Then please
  3. Put the file which you want to transfer under ./files folder, for example *guestshell.17.09.01a.tar* and *pxs.py*.
 
 ### Step 4
-Now you should be ready to go. Run the entry point script:
-
-     $ sudo python3 ./run.py
-
+Now you should be ready to go. Activate the virtual environment if you have not:
+```
+source venv/bin/activate
+```
+Run the entry point script with *sudo* to bind to port 80, and *-E* to preserve the exisiting enviromental:
+```
+sudo -E python3 run.py
+```
 You should be able to see this output in your console. Please double check if the IP address and directories are correct. Otherwise the devices are not able to get what they want.
 ```
 Running PnP server. Stop with ctrl+c
@@ -93,7 +97,7 @@ Listen on port          : 80
 Image file(s) base URL  : http://10.2.3.4/images
 Config file(s) base URL : http://10.2.3.4/configs
 
- * Serving Flask app 'run'
+ * Serving Flask app 'app'
  * Debug mode: off
 ```
 Then boot up all the ISR1k devices. Please make sure they are either new devices or  have been factory-reset. They will not enter the PnP workflow if startup-config exists.

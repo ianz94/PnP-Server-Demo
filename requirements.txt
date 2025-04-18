@@ -1,5 +1,5 @@
-Flask
-apscheduler
-requests
-xmltodict
-mariadb
+Flask==3.0.3
+apscheduler==3.11.0
+requests==2.22.0
+xmltodict==0.14.2
+mariadb==1.1.12
