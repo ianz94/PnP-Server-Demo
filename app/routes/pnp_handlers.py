@@ -214,15 +214,15 @@ def root():
 
 @app.route('/configs/<path:file>')
 def serve_configs(file):
-    return send_from_directory('configs', file, mimetype='text/plain')
+    return send_from_directory('../configs', file, mimetype='text/plain')
 
 @app.route('/images/<path:file>')
 def serve_sw_images(file):
-    return send_from_directory('images', file, mimetype='application/octet-stream')
+    return send_from_directory('../images', file, mimetype='application/octet-stream')
 
 @app.route('/files/<path:file>')
 def serve_files(file):
-    return send_from_directory('files', file, mimetype='application/octet-stream')
+    return send_from_directory('../files', file, mimetype='application/octet-stream')
 
 @app.route('/pnp/HELLO')
 def pnp_hello():
